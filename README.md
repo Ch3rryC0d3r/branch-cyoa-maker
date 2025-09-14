@@ -17,7 +17,7 @@ Use nodes, conditions, variables, inventory, and instantly playtest inside the a
 
 ## ⚡ Features
 
-- Visual node editor (drag & drop)  
+- Visual node editor
 - Customizable themes  
 - Conditions & actions (e.g. `has_item:sword`, `var:gold > 5`)  
 - Randomized branching  
