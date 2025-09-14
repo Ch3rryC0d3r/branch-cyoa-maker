@@ -8,7 +8,6 @@ goofy ah slogan: Got tired of playing choose your own adventures? No problem, Br
 (3): Ctrl+D or click App>Documentation (Ctrl+D) to popup the documentation in app which is just referenced to doc.txt at ./doc.txt || Documentation mentions general use and a whole category for the options in the node inspector due to its' complexity but also can get simple and mostly is, depends on how you use it.
 (4): Fix zooming bug (zooming out then clicking anywhere zooms back in) It's a render issue I'm sure, I don't think I have the self.current_zoom in mind when redrawing with redraw(). 
 (6): In the BG Menu add a "Add Comment"--similar to a node but without an 'options' thing in the inspector. just a 'comment' field--A transparent orange/yellow-ish comment that can be placed anywhere, like on top of nodes to sort for organization or by nodes, whatever.
-(7): If you write "Placeholder | 2/3 |  |" or anything including randoms like '2/3/4' or whatever, ##each of the from edge color (COLOR1 in the draw edges redraw()) will change to whatever your theme 'randomEdgeFromColor' is##. (default: purple)
 (8): ##Fix search node## (doesn't go to the correct position, render issue possibly? or maybe it's going to the incorrect camera position)
 (9): ##Force text in inspector to return## (but be part of the same line, so just visually) if it goes past the SCREEN WIDTH or if the last letter x is greater than SCR WIDTH. And show line numbers (slightly grayed) like "(color=transparentGrey)1.(/color)(color=textThemeColor)Line stuff here wow so cool(/color)"
 (10): ##Entire remaster of Variables & The Inventory System##: Make it where you can do multiple conditions and/or actions like: 'add_item:sword&add_item:shield' or 'has_item:sword&var:gold!=5' and add more expressions for variables such as "var:x+=1", -=, *=, /=. And even more logic such as "var:x=y" setting or editing by other variables and you can infinitely chain like "var:x=(y+(z*l))". And maybe add Math functions like Math.sin (but abbreviate as 'sin'), cos, etc. 
@@ -27,6 +26,7 @@ import tkinter.colorchooser as colorchooser
 import tkinter.font as tkFont
 import tkinter.ttk as ttk
 import os
+
 
 nodes: Dict[int, Dict] = {}  
 vars_store: Dict[str, Any] = {}
@@ -243,6 +243,7 @@ class VisualEditor(tk.Frame):
         return container, body
 
     def __init__(self, master):
+        self.root = master
         super().__init__(master)
         self.master.title("Branch -- Visual CYOA Editor")
         self.pack(fill=tk.BOTH, expand=True)
@@ -265,6 +266,11 @@ class VisualEditor(tk.Frame):
         # toolbar definition
         self.toolbar = tk.Frame(self)
         self.toolbar.pack(side=tk.TOP, fill=tk.X)
+
+        # Font
+        default_font = tkFont.nametofont("TkDefaultFont")
+        default_font.configure(family="Segoe UI", size=10)
+        self.root.option_add("*Font", default_font)
 
         #tk.Button(self.toolbar, text="Add Node", command=self.add_node_prompt).pack(side=tk.LEFT)
         #tk.Button(self.toolbar, text="Delete Node", command=self.delete_selected_node).pack(side=tk.LEFT)
@@ -488,148 +494,200 @@ class VisualEditor(tk.Frame):
         if preset:
             if preset == 'default':
                 self.theme = { 
-                    "canvas_background": "#101010", 
-                    "from_lines": "#00CED1", 
-                    "to_lines": '#FFA500',
-                    'inspector_bg': '#dcdcdc',
-                    'inspector_canvas_bg': '#dcdcdc',
-                    'title_lbl_bg': '#ffffff',
-                    'inspector_frame_bg': '#dcdcdc',
-                    'default_node_color': '#222222',
-                    'node_outline': '#888888',
-                    'node_selected_outline': '#ffcc00',
-                    'multi_selected_outline': '#ff5500',
-                    'node_text_fill': '#ffffff',
-                    'inspector_container': "#dcdcdc",
-                    'inspector_body': "#dcdcdc",
-                    'inspector_label_bg': '#dcdcdc',
-                    'inspector_label_bg2': '#c0c0c0',
-                    'inspector_header': '#c0c0c0',
-                    'inspector_toggle_btn': '#c0c0c0',
-                    'inspector_textbox_bg': '#ffffff',
-                    'inspector_button_bg': '#ffffff',
-                    'preset_canvas_bg': '#ffffff',
-                    'preset_inner_bg': '#ffffff',
-                    'preset_frame_bg': '#ffffff'
+                    "canvas_background": "#1e1e2e", 
+                    "from_lines": "#89dceb", 
+                    "to_lines": "#f38ba8",
+                    "randomEdgeFromColor": "#fab387",
+
+                    "default_node_color": "#313244",
+                    "node_outline": "#585b70",
+                    "node_selected_outline": "#fab387",
+                    "multi_selected_outline": "#f9e2af",
+                    "node_text_fill": "#f5f5f5",
+
+                    "inspector_bg": "#2e2e3e",
+                    "inspector_canvas_bg": "#2e2e3e",
+                    "title_lbl_bg": "#2e2e3e",
+                    "inspector_frame_bg": "#2e2e3e",
+                    "inspector_container": "#313244",
+                    "inspector_body": "#313244",
+                    "inspector_label_bg": "#313244",
+                    "inspector_label_bg2": "#45475a",
+                    "inspector_header": "#45475a",
+                    "inspector_toggle_btn": "#45475a",
+                    "inspector_textbox_bg": "#f5f5f5",
+                    "inspector_button_bg": "#a6e3a1",
+
+                    "preset_canvas_bg": "#ffffff",
+                    "preset_inner_bg": "#ffffff",
+                    "preset_frame_bg": "#ffffff",
                 }
             elif preset == 'cherries':
                 self.theme = { 
-                    "canvas_background": "#513030", 
-                    "from_lines": "#F4513F", 
-                    "to_lines": "#B21C4E",
-                    'inspector_bg': "#e66161",
-                    'inspector_canvas_bg': '#e66161',
-                    'title_lbl_bg': '#e66161',
-                    'inspector_frame_bg': "#cf6a6a",
-                    'default_node_color': "#6A2B2B",
-                    'node_outline': "#772E2E",
-                    'node_selected_outline': "#ff7070",
-                    'multi_selected_outline': '#ff5500',
-                    'node_text_fill': '#ffffff',
-                    'inspector_container': "#e78e8e",
-                    'inspector_body': "#e78e8e",
-                    'inspector_label_bg': "#e78e8e",
-                    'inspector_label_bg2': "#e78e8e",
-                    'inspector_header': "#e78e8e",
-                    'inspector_toggle_btn': "#e78e8e",
-                    'inspector_textbox_bg': "#e9c5c5",
-                    'inspector_button_bg': "#C25555",
-                    'preset_canvas_bg': '#ffffff',
-                    'preset_inner_bg': '#ffffff',
-                    'preset_frame_bg': '#ffffff'
+                    "canvas_background": "#2e1e1f", 
+                    "from_lines": "#f38ba8", 
+                    "to_lines": "#fab387",
+                    "randomEdgeFromColor": "#89b4fa",
+
+                    "default_node_color": "#4a2c31",
+                    "node_outline": "#6e2f3c",
+                    "node_selected_outline": "#fab387",
+                    "multi_selected_outline": "#f9e2af",
+                    "node_text_fill": "#f5f5f5",
+
+                    "inspector_bg": "#3c2a2e",
+                    "inspector_canvas_bg": "#3c2a2e",
+                    "title_lbl_bg": "#3c2a2e",
+                    "inspector_frame_bg": "#3c2a2e",
+                    "inspector_container": "#5a3a40",
+                    "inspector_body": "#5a3a40",
+                    "inspector_label_bg": "#5a3a40",
+                    "inspector_label_bg2": "#704348",
+                    "inspector_header": "#704348",
+                    "inspector_toggle_btn": "#704348",
+                    "inspector_textbox_bg": "#f5f5f5",
+                    "inspector_button_bg": "#f38ba8",
+
+                    "preset_canvas_bg": "#ffffff",
+                    "preset_inner_bg": "#ffffff",
+                    "preset_frame_bg": "#ffffff",
                 }
             elif preset == 'ocean':
                 self.theme = { 
-                    "canvas_background": "#2F4B99", 
-                    "from_lines": "#AFA1FF", 
-                    "to_lines": "#404AFF",
-                    'inspector_bg': '#2b99d9',
-                    'inspector_canvas_bg': "#2b99d9",
-                    'title_lbl_bg': '#2b99d9',
-                    'inspector_frame_bg': '#2b99d9',
-                    'default_node_color': "#444E8C",
-                    'node_outline': "#59586A",
-                    'node_selected_outline': "#7293db",
-                    'multi_selected_outline': '#ff5500',
-                    'node_text_fill': '#ffffff',
-                    'inspector_container': "#8eb0e7",
-                    'inspector_body': "#8eb0e7",
-                    'inspector_label_bg': "#8eb0e7",
-                    'inspector_label_bg2': "#8eb0e7",
-                    'inspector_header': "#8eb0e7",
-                    'inspector_toggle_btn': "#8eb0e7",
-                    'inspector_textbox_bg': "#c5d8e9",
-                    'inspector_button_bg': "#5755C2",
-                    'preset_canvas_bg': '#ffffff',
-                    'preset_inner_bg': '#ffffff',
-                    'preset_frame_bg': '#ffffff'
+                    "canvas_background": "#1e1e2e", 
+                    "from_lines": "#74c7ec", 
+                    "to_lines": "#1e66f5",
+                    "randomEdgeFromColor": "#f9e2af",
+
+                    "default_node_color": "#1e2a40",
+                    "node_outline": "#3a4c6e",
+                    "node_selected_outline": "#89dceb",
+                    "multi_selected_outline": "#fab387",
+                    "node_text_fill": "#f5f5f5",
+
+                    "inspector_bg": "#223449",
+                    "inspector_canvas_bg": "#223449",
+                    "title_lbl_bg": "#223449",
+                    "inspector_frame_bg": "#223449",
+                    "inspector_container": "#304c66",
+                    "inspector_body": "#304c66",
+                    "inspector_label_bg": "#304c66",
+                    "inspector_label_bg2": "#436585",
+                    "inspector_header": "#436585",
+                    "inspector_toggle_btn": "#436585",
+                    "inspector_textbox_bg": "#f5f5f5",
+                    "inspector_button_bg": "#89b4fa",
+
+                    "preset_canvas_bg": "#ffffff",
+                    "preset_inner_bg": "#ffffff",
+                    "preset_frame_bg": "#ffffff",
                 }
             elif preset == 'forest':
                 self.theme = { 
-                    "canvas_background": "#4A422E", 
-                    "from_lines": "#34BE24", 
-                    "to_lines": "#005F0B",
-                    'inspector_bg': "#42b331",
-                    'inspector_canvas_bg': "#42b331",
-                    'title_lbl_bg': '#42b331',
-                    'inspector_frame_bg': '#42b331',
-                    'default_node_color': "#299734",
-                    'node_outline': "#7B5318",
-                    'node_selected_outline': "#d3ffc6",
-                    'multi_selected_outline': '#ff5500',
-                    'node_text_fill': '#ffffff',
-                    'inspector_container': "#5bbf6d",
-                    'inspector_body': "#5bbf6d",
-                    'inspector_label_bg': "#5bbf6d",
-                    'inspector_label_bg2': "#5bbf6d",
-                    'inspector_header': "#5bbf6d",
-                    'inspector_toggle_btn': "#5bbf6d",
-                    'inspector_textbox_bg': "#cce9c5",
-                    'inspector_button_bg': "#55C269",
-                    'preset_canvas_bg': '#ffffff',
-                    'preset_inner_bg': '#ffffff',
-                    'preset_frame_bg': '#ffffff'
-                } 
+                    "canvas_background": "#232e25", 
+                    "from_lines": "#a6e3a1", 
+                    "to_lines": "#e5c890",
+                    "randomEdgeFromColor": "#89b4fa",
+
+                    "default_node_color": "#2e4630",
+                    "node_outline": "#4f6f56",
+                    "node_selected_outline": "#a6e3a1",
+                    "multi_selected_outline": "#fab387",
+                    "node_text_fill": "#f5f5f5",
+
+                    "inspector_bg": "#2a3e2f",
+                    "inspector_canvas_bg": "#2a3e2f",
+                    "title_lbl_bg": "#2a3e2f",
+                    "inspector_frame_bg": "#2a3e2f",
+                    "inspector_container": "#36543d",
+                    "inspector_body": "#36543d",
+                    "inspector_label_bg": "#36543d",
+                    "inspector_label_bg2": "#4a6b51",
+                    "inspector_header": "#4a6b51",
+                    "inspector_toggle_btn": "#4a6b51",
+                    "inspector_textbox_bg": "#f5f5f5",
+                    "inspector_button_bg": "#a6e3a1",
+
+                    "preset_canvas_bg": "#ffffff",
+                    "preset_inner_bg": "#ffffff",
+                    "preset_frame_bg": "#ffffff",
+                }
             elif preset == 'ocean 2':
                 self.theme = { 
-                    "canvas_background": "#2F4B99", 
-                    "from_lines": "#AFA1FF", 
-                    "to_lines": "#404AFF",
-                    'inspector_bg': '#2b99d9',
-                    'inspector_canvas_bg': "#2b99d9",
-                    'title_lbl_bg': '#2b99d9',
-                    'inspector_frame_bg': '#2b99d9',
-                    'default_node_color': "#AF4A4A",
-                    'node_outline': "#59586A",
-                    'node_selected_outline': "#7293db",
-                    'multi_selected_outline': '#ff5500',
-                    'node_text_fill': '#ffffff',
-                    'inspector_container': "#e78e8e",
-                    'inspector_body': "#e78e8e",
-                    'inspector_label_bg': "#e78e8e",
-                    'inspector_label_bg2': "#e78e8e",
-                    'inspector_header': "#e78e8e",
-                    'inspector_toggle_btn': "#e78e8e",
-                    'inspector_textbox_bg': "#e9c5c5",
-                    'inspector_button_bg': "#C25555",
-                    'preset_canvas_bg': '#ffffff',
-                    'preset_inner_bg': '#ffffff',
-                    'preset_frame_bg': '#ffffff'
-                }            
+                    "canvas_background": "#1e1e2e", 
+                    "from_lines": "#74c7ec", 
+                    "to_lines": "#cba6f7",
+                    "randomEdgeFromColor": "#fab387",
+
+                    "default_node_color": "#403347",
+                    "node_outline": "#5b4f63",
+                    "node_selected_outline": "#fab387",
+                    "multi_selected_outline": "#f9e2af",
+                    "node_text_fill": "#f5f5f5",
+
+                    "inspector_bg": "#2f2b3a",
+                    "inspector_canvas_bg": "#2f2b3a",
+                    "title_lbl_bg": "#2f2b3a",
+                    "inspector_frame_bg": "#2f2b3a",
+                    "inspector_container": "#473c57",
+                    "inspector_body": "#473c57",
+                    "inspector_label_bg": "#473c57",
+                    "inspector_label_bg2": "#5e4e71",
+                    "inspector_header": "#5e4e71",
+                    "inspector_toggle_btn": "#5e4e71",
+                    "inspector_textbox_bg": "#f5f5f5",
+                    "inspector_button_bg": "#cba6f7",
+
+                    "preset_canvas_bg": "#ffffff",
+                    "preset_inner_bg": "#ffffff",
+                    "preset_frame_bg": "#ffffff",
+                }
+            
         try:
+            #self.theme.setdefault('randomEdgeFromColor', '#8e44ff')
             self.canvas.config(bg=self.theme['canvas_background'])
             self.inspector.config(bg=self.theme['inspector_bg'])
             self.inspector_canvas.config(bg=self.theme['inspector_canvas_bg'])
             self.title_lbl.config(bg=self.theme['title_lbl_bg'])
             self.inspector_frame.config(bg=self.theme['inspector_frame_bg'])
+            self.redraw()
+
+            def apply_theme_recursive(widget):
+                # background keys
+                bg_keys = [
+                    "inspector_bg", "inspector_canvas_bg", "inspector_frame_bg",
+                    "inspector_container", "inspector_body",
+                    "inspector_label_bg", "inspector_label_bg2",
+                    "inspector_header", "inspector_toggle_btn",
+                    "inspector_textbox_bg", "inspector_button_bg",
+                    "preset_canvas_bg", "preset_inner_bg", "preset_frame_bg"
+                ]
+
+                for child in widget.winfo_children():
+                    # Pick a bg depending on widget type
+                    if isinstance(child, tk.Label):
+                        child.config(bg=self.theme.get("inspector_label_bg", "#2e2e3e"),
+                                    fg=self.theme.get("node_text_fill", "#ffffff"))
+                    elif isinstance(child, tk.Button):
+                        if child.winfo_parent() != str(self.preset_inner):
+                            child.config(bg=self.theme.get("inspector_button_bg", "#a6e3a1"))
+                    elif isinstance(child, tk.Text):
+                        child.config(
+                            bg=self.theme.get("inspector_textbox_bg", "#f5f5f5"),
+                            fg=self.theme.get("inspector_text_fg", "#000000")
+                        )
+                    elif isinstance(child, tk.Frame):
+                        child.config(bg=self.theme.get("inspector_body", "#313244"))
+                    elif isinstance(child, tk.Canvas):
+                        child.config(bg=self.theme.get("inspector_canvas_bg", "#2e2e3e"))
+
+                    # Recurse
+                    apply_theme_recursive(child)
+
+            apply_theme_recursive(self.inspector)
+
         except Exception:
             pass
-        
-        if not changetype == None:
-            self.redraw() 
-            messagebox.showinfo('Please Restart', 'Please restart for all theme changes to take effect.')
-            self.win.lift()
-            self.win.focus()
         
 
 
@@ -755,7 +813,7 @@ class VisualEditor(tk.Frame):
         tk.Button(self.win, text='Cherries', command=lambda: self.themepreset('cherries', 1)).pack(side=tk.TOP, pady=4)
         tk.Button(self.win, text='Ocean', command=lambda: self.themepreset('ocean', 1)).pack(side=tk.TOP, pady=4)
         tk.Button(self.win, text='Forest', command=lambda: self.themepreset('forest', 1)).pack(side=tk.TOP, pady=4)
-        tk.Button(self.win, text='Cherry Ocean', command=lambda: self.themepreset('ocean 2', 1)).pack(side=tk.TOP, pady=4)
+        tk.Button(self.win, text='Ocean (v2)', command=lambda: self.themepreset('ocean 2', 1)).pack(side=tk.TOP, pady=4)
 
 
 
@@ -1189,6 +1247,8 @@ class VisualEditor(tk.Frame):
             COLOR2 = self.theme['to_lines']
         else:
             COLOR2 = '#ffa500'
+        RANDOM_EDGE_COLOR = self.theme.get('randomEdgeFromColor', '#8e44ff')
+            
 
         for nid, data in nodes.items():
             x1 = data.get("x", 50) + NODE_W // 2
@@ -1196,6 +1256,7 @@ class VisualEditor(tk.Frame):
 
             for opt in data.get("options", []):
                 nxt_raw = opt.get("next")
+                is_multi_choice = isinstance(nxt_raw, str) and "/" in nxt_raw
                 if not nxt_raw:
                     continue
 
@@ -1246,8 +1307,9 @@ class VisualEditor(tk.Frame):
                                 break
 
                     if reverse_exists:
+                        from_color = RANDOM_EDGE_COLOR if is_multi_choice else COLOR1
                         line = self.canvas.create_line(
-                            x1, y1, x2, y2, width=3, fill=COLOR1, smooth=True
+                            x1, y1, x2, y2, width=3, fill=from_color, smooth=True
                         )
                         self.edge_items.append(line)
                         self.canvas.tag_lower(line)
@@ -1257,8 +1319,9 @@ class VisualEditor(tk.Frame):
                         mid_x = (x1 + x2) / 2
                         mid_y = (y1 + y2) / 2
 
+                        from_color = RANDOM_EDGE_COLOR if is_multi_choice else COLOR1
                         line1 = self.canvas.create_line(
-                            x1, y1, mid_x, mid_y, width=3, fill=COLOR1, smooth=True
+                            x1, y1, mid_x, mid_y, width=3, fill=from_color, smooth=True
                         )
                         line2 = self.canvas.create_line(
                             mid_x, mid_y, x2, y2, width=3, fill=COLOR2, smooth=True, arrow=tk.LAST
