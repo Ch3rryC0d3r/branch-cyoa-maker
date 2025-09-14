@@ -3,11 +3,8 @@
 goofy ah slogan: Got tired of playing choose your own adventures? No problem, Branch gives you the ability to MAKE your own adventures, easily and cleanly.
 ******************************************To Do******************************************
 
-(1): Due to <Configure> or whatever it's called ##you can't resize the inspector on the left edge##. I want it to be resize-able.
-(2): Fix zooming bug (zooming out then clicking anywhere zooms back in) It's a render issue I'm sure, I don't think I have the self.current_zoom in mind when redrawing with redraw(). 
 (3): In the BG Menu add a "Add Comment"--similar to a node but without an 'options' thing in the inspector. just a 'comment' field--A transparent orange/yellow-ish comment that can be placed anywhere, like on top of nodes to sort for organization or by nodes, whatever.
 (4): ##Fix search node## (doesn't go to the correct position, render issue possibly? or maybe it's going to the incorrect camera position)
-(5): ##Force text in inspector to return## (but be part of the same line, so just visually) if it goes past the SCREEN WIDTH or if the last letter x is greater than SCR WIDTH. And show line numbers (slightly grayed) like "(color=transparentGrey)1.(/color)(color=textThemeColor)Line stuff here wow so cool(/color)"
 
 ********************************************************************************************
 """ "#8eb0e7"
@@ -109,6 +106,7 @@ def safe_eval_expr(expr: str, names: dict):
 
 
 nodes: Dict[int, Dict] = {}  
+comments = {}
 vars_store: Dict[str, Any] = {}
 inventory: List[str] = []
 START_NODE = 1
@@ -478,12 +476,12 @@ class VisualEditor(tk.Frame):
             "disable_delete_confirm": False,
             "show_path": False,
             "udtdnc": False,
-            "disable_zooming": False,
+            #"disable_zooming": False,
             "keybinds": {
                 "undo": "<Control-z>",
                 "redo": "<Control-Shift-Z>",
                 "redo_alt": "<Control-y>",
-                "reset_zoom": "<Control-0>",
+                #"reset_zoom": "<Control-0>",
                 "save": "<Control-s>"
             }
         }
@@ -500,7 +498,7 @@ class VisualEditor(tk.Frame):
         self.app_menu.add_command(label="Undo (Ctrl+Z)", command=self.undo)
         self.app_menu.add_command(label="Redo (Ctrl+Shift+Z / Ctrl+Y)", command=self.redo)
         self.app_menu.add_separator()
-        self.app_menu.add_command(label="Reset Zoom (Ctrl+0)", command=self.reset_zoom)
+        #self.app_menu.add_command(label="Reset Zoom (Ctrl+0)", command=self.reset_zoom)
         self.app_menu.add_separator()
         self.app_menu.add_command(label="Clear all saves", command=self.clear_all_saves)
         self.app_menu.add_command(label="Save (Ctrl+S)", command=self.save_story_dialog)
@@ -518,7 +516,7 @@ class VisualEditor(tk.Frame):
         self.canvas = tk.Canvas(canvas_frame, bg='#101010', width=900, height=600,
                                 scrollregion=(-100000,-100000,100000,100000))
         self.canvas.pack(fill=tk.BOTH, expand=True)
-        self.canvas.bind("<MouseWheel>", self.canvas_zoom)
+        #self.canvas.bind("<MouseWheel>", self.canvas_zoom)
         # Setup Controls
         self.setup_controls()
         # Node Menu (right clicking on a node)
@@ -565,39 +563,45 @@ class VisualEditor(tk.Frame):
         self.id_label = tk.Label(node_body, text="ID: -", bg=self.theme['inspector_label_bg'])
         self.id_label.pack(anchor="w")
         # Header stuff
-        tk.Label(node_body, text="Header:", bg=self.theme['inspector_label_bg']).pack(anchor="w")
-        self.header_text = tk.Text(node_body, height=3, wrap='word', bg=self.theme['inspector_textbox_bg'])
-        self.header_text.pack_propagate(False)  # don’t let children control width
+        tk.Label(node_body, width=10, text="Header:", bg=self.theme['inspector_label_bg']).pack(anchor="w")
+        self.header_text = tk.Text(
+            node_body,
+            height=3,
+            wrap="word",  # wrap properly at words
+            bg=self.theme['inspector_textbox_bg']
+        )
+        self.header_text.pack(fill="x", expand=True, padx=4, pady=2)  # let it expand horizontally
 
-        self.header_text.pack(anchor="w", fill="x", expand=True, padx=4, pady=2)
-        #node_body.bind("<Configure>", self._sync_text_width)
         # ***************************Options Section***************************
         opt_sec, opt_body = self.make_collapsible_section(self.inspector, "Options")
         opt_sec.pack(fill=tk.X, pady=(4,0))
         tk.Label(opt_body, text="text | next | condition | actions", bg=self.theme['inspector_label_bg']).pack(anchor="w")
-        self.options_text = tk.Text(opt_body, height=8, bg=self.theme['inspector_textbox_bg'])
-        self.options_text.pack(anchor="w", fill=tk.X, padx=4, pady=2)
-        #tk.Button(opt_body, text="Apply Edits", command=self.apply_edits, bg=self.theme['inspector_button_bg']).pack(anchor="w", pady=(6,0))
+        self.options_text = tk.Text(opt_body, height=8, wrap="word", bg=self.theme['inspector_textbox_bg'])
+        self.options_text.pack(fill="x", expand=True, padx=4, pady=2)
         tk.Button(opt_body, text="Set as Start Node", command=self.set_start_node, bg=self.theme['inspector_button_bg']).pack(anchor="w", pady=(6,0))
+       
         # ***************************Variables and Inventory section.***************************
         vars_sec, vars_body = self.make_collapsible_section(self.inspector, "Variables & Inventory")
         vars_sec.pack(fill=tk.X, pady=(4,0))
+
         # Vars List
-        self.vars_list = tk.Text(vars_body, height=5, bg=self.theme['inspector_textbox_bg'])
-        self.vars_list.pack(anchor="w", fill=tk.X, padx=4, pady=2)
-        #tk.Button(vars_body, text="Apply Vars", command=self.apply_vars_text, bg=self.theme['inspector_button_bg']).pack(anchor="w", pady=(4,0))
+        self.vars_list = tk.Text(vars_body, height=5, wrap="word", bg=self.theme['inspector_textbox_bg'])
+        self.vars_list.pack(fill="x", expand=True, padx=4, pady=2)
+
         # ***************************Color Section***************************
-        self.header_text = tk.Text(
-            node_body, height=3, width=10, wrap="word", bg=self.theme['inspector_textbox_bg']
-        )
+        def sync_text_width(event):
+            text_widget = event.widget
+            # get current width of the frame in pixels
+            width_px = text_widget.winfo_width()
+            # convert pixels → approx characters (roughly)
+            char_width = text_widget.winfo_fpixels("1c")
+            new_width = max(int(width_px / char_width), 1)
+            text_widget.config(width=new_width)
 
-        self.options_text = tk.Text(
-            opt_body, height=8, wrap="word", bg=self.theme['inspector_textbox_bg']
-        )
+        self.header_text.bind("<Configure>", sync_text_width)
+        self.options_text.bind("<Configure>", sync_text_width)
+        self.vars_list.bind("<Configure>", sync_text_width)
 
-        self.vars_list = tk.Text(
-            vars_body, height=5, wrap="word", bg=self.theme['inspector_textbox_bg']
-        )
 
         color_sec, color_body = self.make_collapsible_section(self.inspector, "Colors")
         color_sec.pack(fill=tk.X, pady=(4,0))
@@ -643,7 +647,8 @@ class VisualEditor(tk.Frame):
         # Background Right Click Menu
         self.bg_menu = tk.Menu(self.canvas, tearoff=0)
         self.bg_menu.add_command(label="(Quick) Add Node", command=lambda: self.quick_add_node())
-        self.bg_menu.add_command(label="(Specific ID) Add Node", command=self.add_node_prompt)        
+        self.bg_menu.add_command(label="(Specific ID) Add Node", command=self.add_node_prompt)  
+        self.bg_menu.add_command(label="Add Comment", command=self.add_comment_prompt)     
         self.canvas.bind("<Button-3>", self.background_right_click)
         # Define nodes and edges initally
         self.node_rects: Dict[int, int] = {}
@@ -664,14 +669,7 @@ class VisualEditor(tk.Frame):
         self.master.bind("<Control-z>", lambda e: self.undo())
         self.master.bind("<Control-Shift-Z>", lambda e: self.redo())
         self.master.bind("<Control-y>", lambda e: self.redo())
-        self.master.bind("<Control-0>", lambda e: self.reset_zoom())
-        self.master.bind("<Control-s>", lambda e: self.save_story_dialog())
-        
-    #def _sync_text_width(self, event):
-    #    font = tkFont.Font(font=self.header_text.cget("font"))
-    #    avg_char_px = max(1, font.measure("0"))
-    #    cols = max(5, (event.width - 8) // avg_char_px)
-    #    self.header_text.configure(width=cols)
+        #self.master.bind("<Control-0>", lambda e: self.reset_zoom())
 
     def _on_modified(self, event):
         if self.updating:
@@ -885,9 +883,20 @@ class VisualEditor(tk.Frame):
 
         except Exception:
             pass
+
+    def add_comment_prompt(self):
+        w, h = self.canvas.winfo_width(), self.canvas.winfo_height()
+        cx, cy = self.canvas.canvasx(w/2), self.canvas.canvasy(h/2)
         
-
-
+        new_id = max(comments.keys(), default=0) + 1
+        comments[new_id] = {
+            "x": cx,
+            "y": cy,
+            "text": f"Comment {new_id}"
+        }
+        
+        self.selected_comment = new_id  # similar to selected_node
+        self.redraw()  # we’ll handle drawing them next
 
     def setup_controls(self):
         self.pressed_keys = set()
@@ -943,11 +952,11 @@ class VisualEditor(tk.Frame):
         self.master.bind(self.settings["keybinds"]["undo"], lambda e: self.undo())
         self.master.bind(self.settings["keybinds"]["redo"], lambda e: self.redo())
         self.master.bind(self.settings["keybinds"]["redo_alt"], lambda e: self.redo())
-        self.master.bind(self.settings["keybinds"]["reset_zoom"], lambda e: self.reset_zoom())
+        #self.master.bind(self.settings["keybinds"]["reset_zoom"], lambda e: self.reset_zoom())
         self.master.bind(self.settings["keybinds"]["save"], lambda e: self.save_story_dialog())        
         self.app_menu.entryconfig(0, label=f"Undo ({self.pretty_key(self.settings['keybinds']['undo'])})")
         self.app_menu.entryconfig(1, label=f"Redo ({self.pretty_key(self.settings['keybinds']['redo'])} / {self.pretty_key(self.settings['keybinds']['redo_alt'])})")
-        self.app_menu.entryconfig(3, label=f"Reset Zoom ({self.pretty_key(self.settings['keybinds']['reset_zoom'])})")
+        #self.app_menu.entryconfig(3, label=f"Reset Zoom ({self.pretty_key(self.settings['keybinds']['reset_zoom'])})")
         self.app_menu.entryconfig(5, label=f"Save ({self.pretty_key(self.settings['keybinds']['save'])})")
         
     def pretty_key(self, seq: str) -> str:
@@ -973,10 +982,10 @@ class VisualEditor(tk.Frame):
                             command=lambda: self.settings.update(udtdnc=var2.get()))
         chk3.pack(anchor="w", pady=4)
         ######################
-        var3 = tk.BooleanVar(value=self.settings["disable_zooming"])
-        chk4 = tk.Checkbutton(win, text="Disable zooming", variable=var3,
-                            command=lambda: self.settings.update(disable_zooming=var3.get()))
-        chk4.pack(anchor="w", pady=4)
+        #var3 = tk.BooleanVar(value=self.settings["disable_zooming"])
+        #chk4 = tk.Checkbutton(win, text="Disable zooming", variable=var3,
+        #                    command=lambda: self.settings.update(disable_zooming=var3.get()))
+        #chk4.pack(anchor="w", pady=4)
         ######################
         tk.Label(win, text="Keybinds:").pack(anchor="w", pady=(10,0))
         for action, seq in self.settings["keybinds"].items():
@@ -1043,7 +1052,7 @@ class VisualEditor(tk.Frame):
         self.settings["disable_delete_confirm"] = self.delete_confirm_var.get()    
         self.settings["show_path"] = self.show_path.get()    
         self.settings["udtdnc"] = self.udtdnc.get() 
-        self.settings["disable_zooming"] = self.disable_zooming.get() 
+        #self.settings["disable_zooming"] = self.disable_zooming.get() 
 
     def add_node_prompt(self):
         nid = simpledialog.askinteger("Add Node", "Node ID (int):", minvalue=1)
@@ -1193,7 +1202,6 @@ class VisualEditor(tk.Frame):
 
 
     def background_right_click(self, event):
-        
         cx, cy = self.canvas.canvasx(event.x), self.canvas.canvasy(event.y)
         clicked = self.canvas.find_overlapping(cx, cy, cx, cy)
         for item in clicked:
@@ -1553,6 +1561,37 @@ class VisualEditor(tk.Frame):
                 self.canvas.itemconfig(rect, outline=self.theme['node_selected_outline'], width=3)
             elif nid in self.multi_selected_nodes:
                 self.canvas.itemconfig(rect, outline=self.theme['multi_selected_outline'], width=3)
+        
+        # Draw comments
+        for cid, data in comments.items():
+            x, y = data["x"] * self.current_zoom, data["y"] * self.current_zoom
+            rect = self.canvas.create_rectangle(
+                x, y, x + 150 * self.current_zoom, y + 50 * self.current_zoom,
+                fill="#FFA500", outline="#FFCC66", stipple="gray25", width=2,
+                tags=("comment", str(cid))
+            )
+            font_obj = tkFont.Font(family="TkDefaultFont", size=int(10*self.current_zoom))
+            txt = self.canvas.create_text(
+                x + 5*self.current_zoom, y + 5*self.current_zoom,
+                anchor="nw", text=data["text"], font=font_obj,
+                fill="#333333", width=140*self.current_zoom, tags=("comment_text", str(cid))
+            )
+
+    def load_selected_comment_into_inspector(self):
+        if self.selected_comment is None:
+            return
+        data = comments.get(self.selected_comment)
+        if not data:
+            return
+        self.comment_text_widget.delete("1.0", tk.END)
+        self.comment_text_widget.insert(tk.END, data["text"])
+
+    def apply_comment_edits(self):
+        if self.selected_comment is None:
+            return
+        comments[self.selected_comment]["text"] = self.comment_text_widget.get("1.0", tk.END).strip()
+        self.redraw()
+
 
     def get_node_at(self, x, y):
         for nid, data in nodes.items():
