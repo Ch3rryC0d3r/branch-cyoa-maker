@@ -102,10 +102,5 @@ branch-cyoa-maker/
 
 ---
 
-## 🐸 Slogan
-*"Branch out your imagination."* 🌿  
-
----
-
 ## 📜 License
 This project is licensed under the [MIT License](LICENSE).  
