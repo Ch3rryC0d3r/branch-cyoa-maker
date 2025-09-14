@@ -88,27 +88,6 @@ goto:5                     # force jump to node 5
 
 ---
 
-## 👀 Example
-
-```text
-Node 1: "You see a fork in the road."
- ├─ Go left | 2
- └─ Go right | 3
-
-Node 2: "You find a river."
- ├─ Swim across | 4 | | set:wet=True
- └─ Turn back | 1
-
-Node 3: "A dragon sleeps."
- ├─ Sneak past | 4
- └─ Attack | 5 | has_item:sword
-
-Node 4: "You reach a village. The End."
-Node 5: "The dragon roasts you. Game over."
-```
-
----
-
 ## 📂 Repo Structure
 
 ```text
@@ -120,17 +99,6 @@ branch-cyoa-maker/
 ├── LICENSE
 └── README.md
 ```
-
----
-
-## 📆 Roadmap
-
-- [ ] Resizable inspector  
-- [ ] Inline variable display in headers (`You have {CLICKS} clicks!`)  
-- [ ] Math functions in conditions (`sin`, `cos`, etc.)  
-- [ ] Copy/paste for headers + option lists  
-- [ ] In-app docs popup (Ctrl+D)  
-- [ ] Export story as standalone format (HTML / EXE)  
 
 ---
 
