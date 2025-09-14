@@ -8,8 +8,6 @@ goofy ah slogan: Got tired of playing choose your own adventures? No problem, Br
 (3): In the BG Menu add a "Add Comment"--similar to a node but without an 'options' thing in the inspector. just a 'comment' field--A transparent orange/yellow-ish comment that can be placed anywhere, like on top of nodes to sort for organization or by nodes, whatever.
 (4): ##Fix search node## (doesn't go to the correct position, render issue possibly? or maybe it's going to the incorrect camera position)
 (5): ##Force text in inspector to return## (but be part of the same line, so just visually) if it goes past the SCREEN WIDTH or if the last letter x is greater than SCR WIDTH. And show line numbers (slightly grayed) like "(color=transparentGrey)1.(/color)(color=textThemeColor)Line stuff here wow so cool(/color)"
-(6): ##Entire remaster of Variables & The Inventory System##: Make it where you can do multiple conditions and/or actions like: 'add_item:sword&add_item:shield' or 'has_item:sword&var:gold!=5' and add more expressions for variables such as "var:x+=1", -=, *=, /=. And even more logic such as "var:x=y" setting or editing by other variables and you can infinitely chain like "var:x=(y+(z*l))". And maybe add Math functions like Math.sin (but abbreviate as 'sin'), cos, etc. 
-(7): ##Add inline variable display in headers##, like let's say you wanted to make a clicker game, pressing the option 'click' will just bring you back to node 1 but increase variable clicks by CPC(clicks per click) so Header is : "You have {CLICKS} clicks!", and option 1 would be: "Click | 1 |  | var:CLICKS+=CPC" and option 2 for example: "Buy +1 CPC for {CPCPRICE} Clicks | 1 | var:CLICKS>=CPCPRICE | var:CPC+=1&var:CLICKS-=CPCPRICE", also if not already when reset_state() is called or something similar, vars & inventory (SHOULD) reset to what you put in there (e.g., 'x=0' and on line 2 'inv:' will reset x to 0. and clear inventory, but it clears inventory by default.)
 
 ********************************************************************************************
 """ "#8eb0e7"
@@ -142,12 +140,6 @@ def format_option_line(opt: Dict) -> str:
     return f"{opt.get('text','')} | {nxt} | {cond} | {acts}"
 
 def evaluate_condition(cond: Optional[str]) -> bool:
-    """
-    Supports:
-      - multiple conditions joined with & or ;
-      - has_item:NAME / not_has_item:NAME
-      - var:EXPR   (EXPR can be comparisons or math using safe_eval_expr)
-    """
     if not cond:
         return True
     parts = [p.strip() for p in re.split(r'[&;]', cond) if p.strip()]
@@ -163,23 +155,18 @@ def evaluate_condition(cond: Optional[str]) -> bool:
                 if name in inventory:
                     return False
                 continue
-            if part.startswith("var:"):
-                expr = part.split(":", 1)[1].strip()
-                # safe_eval_expr handles comparators and returns bool or numeric
-                try:
-                    res = safe_eval_expr(expr, vars_store)
-                except Exception:
+            # allow both var:EXPR and bare EXPR
+            expr = part[4:].strip() if part.startswith("var:") else part
+            try:
+                res = safe_eval_expr(expr, vars_store)
+            except Exception:
+                return False
+            if isinstance(res, bool):
+                if not res:
                     return False
-                if isinstance(res, bool):
-                    if not res:
-                        return False
-                else:
-                    # truthiness for numeric/string
-                    if not res:
-                        return False
-                continue
-            # unknown condition type -> treat as false (safer)
-            return False
+            else:
+                if not res:
+                    return False
         except Exception:
             return False
     return True
@@ -236,6 +223,52 @@ def execute_actions(actions: List[str]):
                 elif sub.startswith("goto:"):
                     vars_store["__goto"] = sub.split(":",1)[1].strip()
 
+                m2 = re.match(r"^([A-Za-z_][A-Za-z0-9_]*)\s*([\+\-\*/%]?=)\s*(.+)$", sub)
+                if m2:
+                    name, op, rhs = m2.group(1), m2.group(2), m2.group(3)
+                    # evaluate RHS safely
+                    try:
+                        rhs_val = safe_eval_expr(rhs, vars_store)
+                    except Exception:
+                        try:
+                            rhs_val = int(rhs)
+                        except Exception:
+                            try:
+                                rhs_val = float(rhs)
+                            except Exception:
+                                rhs_val = rhs.strip('"').strip("'")
+                    cur = vars_store.get(name, 0)
+                    # apply operator
+                    if op == "=":
+                        vars_store[name] = rhs_val
+                    elif op == "+=":
+                        try:
+                            vars_store[name] = (cur or 0) + rhs_val
+                        except Exception:
+                            vars_store[name] = rhs_val
+                    elif op == "-=":
+                        try:
+                            vars_store[name] = (cur or 0) - rhs_val
+                        except Exception:
+                            vars_store[name] = cur
+                    elif op == "*=":
+                        try:
+                            vars_store[name] = (cur or 0) * rhs_val
+                        except Exception:
+                            vars_store[name] = cur
+                    elif op == "/=":
+                        try:
+                            vars_store[name] = (cur or 0) / rhs_val
+                        except Exception:
+                            vars_store[name] = cur
+                    elif op == "%=":
+                        try:
+                            vars_store[name] = (cur or 0) % rhs_val
+                        except Exception:
+                            vars_store[name] = cur
+                    # handled — skip further checks for this sub
+                    continue
+
                 elif sub.startswith("var:"):
                     payload = sub.split(":",1)[1].strip()
                     # match var:x+=expr  var:x=expr etc.
@@ -290,7 +323,6 @@ def execute_actions(actions: List[str]):
                         except Exception:
                             vars_store[name] = val_expr
             except Exception:
-                # be forgiving: skip failing sub-action
                 continue
 
 def resolve_next(next_ref: Union[int, str]) -> Optional[int]:
@@ -535,6 +567,8 @@ class VisualEditor(tk.Frame):
         # Header stuff
         tk.Label(node_body, text="Header:", bg=self.theme['inspector_label_bg']).pack(anchor="w")
         self.header_text = tk.Text(node_body, height=3, wrap='word', bg=self.theme['inspector_textbox_bg'])
+        self.header_text.pack_propagate(False)  # don’t let children control width
+
         self.header_text.pack(anchor="w", fill="x", expand=True, padx=4, pady=2)
         #node_body.bind("<Configure>", self._sync_text_width)
         # ***************************Options Section***************************
@@ -553,6 +587,18 @@ class VisualEditor(tk.Frame):
         self.vars_list.pack(anchor="w", fill=tk.X, padx=4, pady=2)
         #tk.Button(vars_body, text="Apply Vars", command=self.apply_vars_text, bg=self.theme['inspector_button_bg']).pack(anchor="w", pady=(4,0))
         # ***************************Color Section***************************
+        self.header_text = tk.Text(
+            node_body, height=3, width=10, wrap="word", bg=self.theme['inspector_textbox_bg']
+        )
+
+        self.options_text = tk.Text(
+            opt_body, height=8, wrap="word", bg=self.theme['inspector_textbox_bg']
+        )
+
+        self.vars_list = tk.Text(
+            vars_body, height=5, wrap="word", bg=self.theme['inspector_textbox_bg']
+        )
+
         color_sec, color_body = self.make_collapsible_section(self.inspector, "Colors")
         color_sec.pack(fill=tk.X, pady=(4,0))
         # Pick Node Color (you can pick any color on Tkinters' default 'colorchooser' for the currently selected node)
