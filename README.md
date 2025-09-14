@@ -13,8 +13,6 @@
 Branch is a visual editor + runtime that lets you build branching narratives — no heavy coding needed.  
 Use nodes, conditions, variables, inventory, and instantly playtest inside the app.
 
-Think **Twine**, but with more RPG-tools and Python / Tkinter vibes.
-
 ---
 
 ## ⚡ Features
