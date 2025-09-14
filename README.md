@@ -10,22 +10,22 @@
 
 ## ✨ What is Branch?
 
-Branch is a visual editor + runtime that lets you build branching narratives — no heavy coding needed.  
-Use nodes, conditions, variables, inventory, and instantly playtest inside the app.
+Branch is a **visual editor + runtime** that lets you build branching narratives — no heavy coding needed.  
+Use **nodes, conditions, variables, inventory**, and instantly playtest inside the app.
 
 ---
 
 ## ⚡ Features
 
-- Visual node editor
-- Customizable themes  
-- Conditions & actions (e.g. `has_item:sword`, `var:gold > 5`)  
-- Randomized branching  
-- Variables + inventory built in  
-- Undo / redo  
-- Search & zoom nodes  
-- Play mode & instant feedback  
-- Save / load stories as JSON  
+- 🎨 Visual node editor  
+- 🖌️ Customizable themes  
+- 📜 Conditions & actions (e.g. `has_item:sword`, `var:gold > 5`)  
+- 🎲 Randomized branching  
+- 📦 Variables + inventory built in  
+- ↩️ Undo / redo  
+- 🔍 Search & zoom nodes  
+- ▶️ Play mode & instant feedback  
+- 💾 Save / load stories as JSON  
 
 ---
 
@@ -34,3 +34,110 @@ Use nodes, conditions, variables, inventory, and instantly playtest inside the a
 ```bash
 git clone https://github.com/Ch3rryC0d3r/branch-cyoa-maker.git
 cd branch-cyoa-maker
+```
+
+Make sure you have **Python 3.8+** and **Tkinter** installed. Then run:
+
+```bash
+python Branch.py
+```
+
+---
+
+## 🚀 Usage
+
+### Creating Nodes
+- Right click background → **Add Node**  
+- Edit node header & options in the inspector  
+
+Options follow this format:  
+
+```text
+Text | NextNodeID | Condition | Actions
+```
+
+---
+
+### Conditions
+```text
+has_item:sword       # requires sword in inventory
+var:gold==10         # requires gold == 10
+```
+
+### Actions
+```text
+set:gold=5                # set variable
+add_item:sword             # add to inventory
+remove_item:sword          # remove from inventory
+rand_set:mood:happy,sad    # random choice
+goto:5                     # force jump to node 5
+```
+
+---
+
+### Play Mode
+- Switch to **Play Mode** (toolbar button)  
+- Choices are displayed as buttons  
+- Restart or close play mode anytime  
+
+---
+
+### Saving & Loading
+- Save: `App → Save (Ctrl+S)` → saves to `./saves/your_story.json`  
+- Load: `App → Load` → pick a JSON file  
+
+---
+
+## 👀 Example
+
+```text
+Node 1: "You see a fork in the road."
+ ├─ Go left | 2
+ └─ Go right | 3
+
+Node 2: "You find a river."
+ ├─ Swim across | 4 | | set:wet=True
+ └─ Turn back | 1
+
+Node 3: "A dragon sleeps."
+ ├─ Sneak past | 4
+ └─ Attack | 5 | has_item:sword
+
+Node 4: "You reach a village. The End."
+Node 5: "The dragon roasts you. Game over."
+```
+
+---
+
+## 📂 Repo Structure
+
+```text
+branch-cyoa-maker/
+├── Branch.py          # main application
+├── saves/             # story save files
+├── settings.json      # user settings (auto-created)
+├── theme.json         # theme presets (auto-created)
+├── LICENSE
+└── README.md
+```
+
+---
+
+## 📆 Roadmap
+
+- [ ] Resizable inspector  
+- [ ] Inline variable display in headers (`You have {CLICKS} clicks!`)  
+- [ ] Math functions in conditions (`sin`, `cos`, etc.)  
+- [ ] Copy/paste for headers + option lists  
+- [ ] In-app docs popup (Ctrl+D)  
+- [ ] Export story as standalone format (HTML / EXE)  
+
+---
+
+## 🐸 Slogan
+*"Branch out your imagination."* 🌿  
+
+---
+
+## 📜 License
+This project is licensed under the [MIT License](LICENSE).  
