@@ -3,29 +3,111 @@
 goofy ah slogan: Got tired of playing choose your own adventures? No problem, Branch gives you the ability to MAKE your own adventures, easily and cleanly.
 ******************************************To Do******************************************
 
-(1): Choose a name for the options 'coding lang' like "Option Here | 2 |  |  "  name idea: Leaves. (each line is called a Leaf, I think it fits due to the app name, "Branch".)
-(2): Due to <Configure> or whatever it's called ##you can't resize the inspector on the left edge##. I want it to be resize-able.
-(3): Ctrl+D or click App>Documentation (Ctrl+D) to popup the documentation in app which is just referenced to doc.txt at ./doc.txt || Documentation mentions general use and a whole category for the options in the node inspector due to its' complexity but also can get simple and mostly is, depends on how you use it.
-(4): Fix zooming bug (zooming out then clicking anywhere zooms back in) It's a render issue I'm sure, I don't think I have the self.current_zoom in mind when redrawing with redraw(). 
-(6): In the BG Menu add a "Add Comment"--similar to a node but without an 'options' thing in the inspector. just a 'comment' field--A transparent orange/yellow-ish comment that can be placed anywhere, like on top of nodes to sort for organization or by nodes, whatever.
-(8): ##Fix search node## (doesn't go to the correct position, render issue possibly? or maybe it's going to the incorrect camera position)
-(9): ##Force text in inspector to return## (but be part of the same line, so just visually) if it goes past the SCREEN WIDTH or if the last letter x is greater than SCR WIDTH. And show line numbers (slightly grayed) like "(color=transparentGrey)1.(/color)(color=textThemeColor)Line stuff here wow so cool(/color)"
-(10): ##Entire remaster of Variables & The Inventory System##: Make it where you can do multiple conditions and/or actions like: 'add_item:sword&add_item:shield' or 'has_item:sword&var:gold!=5' and add more expressions for variables such as "var:x+=1", -=, *=, /=. And even more logic such as "var:x=y" setting or editing by other variables and you can infinitely chain like "var:x=(y+(z*l))". And maybe add Math functions like Math.sin (but abbreviate as 'sin'), cos, etc. 
-(11): ##Add inline variable display in headers##, like let's say you wanted to make a clicker game, pressing the option 'click' will just bring you back to node 1 but increase variable clicks by CPC(clicks per click) so Header is : "You have {CLICKS} clicks!", and option 1 would be: "Click | 1 |  | var:CLICKS+=CPC" and option 2 for example: "Buy +1 CPC for {CPCPRICE} Clicks | 1 | var:CLICKS>=CPCPRICE | var:CPC+=1&var:CLICKS-=CPCPRICE", also if not already when reset_state() is called or something similar, vars & inventory (SHOULD) reset to what you put in there (e.g., 'x=0' and on line 2 'inv:' will reset x to 0. and clear inventory, but it clears inventory by default.)
-(12): Copy, Paste & Clear buttons for header and options list
+(1): Due to <Configure> or whatever it's called ##you can't resize the inspector on the left edge##. I want it to be resize-able.
+(2): Fix zooming bug (zooming out then clicking anywhere zooms back in) It's a render issue I'm sure, I don't think I have the self.current_zoom in mind when redrawing with redraw(). 
+(3): In the BG Menu add a "Add Comment"--similar to a node but without an 'options' thing in the inspector. just a 'comment' field--A transparent orange/yellow-ish comment that can be placed anywhere, like on top of nodes to sort for organization or by nodes, whatever.
+(4): ##Fix search node## (doesn't go to the correct position, render issue possibly? or maybe it's going to the incorrect camera position)
+(5): ##Force text in inspector to return## (but be part of the same line, so just visually) if it goes past the SCREEN WIDTH or if the last letter x is greater than SCR WIDTH. And show line numbers (slightly grayed) like "(color=transparentGrey)1.(/color)(color=textThemeColor)Line stuff here wow so cool(/color)"
+(6): ##Entire remaster of Variables & The Inventory System##: Make it where you can do multiple conditions and/or actions like: 'add_item:sword&add_item:shield' or 'has_item:sword&var:gold!=5' and add more expressions for variables such as "var:x+=1", -=, *=, /=. And even more logic such as "var:x=y" setting or editing by other variables and you can infinitely chain like "var:x=(y+(z*l))". And maybe add Math functions like Math.sin (but abbreviate as 'sin'), cos, etc. 
+(7): ##Add inline variable display in headers##, like let's say you wanted to make a clicker game, pressing the option 'click' will just bring you back to node 1 but increase variable clicks by CPC(clicks per click) so Header is : "You have {CLICKS} clicks!", and option 1 would be: "Click | 1 |  | var:CLICKS+=CPC" and option 2 for example: "Buy +1 CPC for {CPCPRICE} Clicks | 1 | var:CLICKS>=CPCPRICE | var:CPC+=1&var:CLICKS-=CPCPRICE", also if not already when reset_state() is called or something similar, vars & inventory (SHOULD) reset to what you put in there (e.g., 'x=0' and on line 2 'inv:' will reset x to 0. and clear inventory, but it clears inventory by default.)
 
 ********************************************************************************************
 """ "#8eb0e7"
 
-import json
-import random
+import json, random, os, ast, math, operator, re
+from typing import Any
 import tkinter as tk
 from tkinter import filedialog, messagebox, simpledialog
 from typing import Any, Dict, List, Optional, Tuple, Union
 import tkinter.colorchooser as colorchooser
 import tkinter.font as tkFont
 import tkinter.ttk as ttk
-import os
+
+_ALLOWED_MATH_FUNCS = {
+    'sin': math.sin, 'cos': math.cos, 'tan': math.tan, 'sqrt': math.sqrt,
+    'abs': abs, 'min': min, 'max': max, 'round': round, 'int': int, 'float': float
+}
+_ALLOWED_OPERATORS = {
+    ast.Add: operator.add,
+    ast.Sub: operator.sub,
+    ast.Mult: operator.mul,
+    ast.Div: operator.truediv,
+    ast.Pow: operator.pow,
+    ast.Mod: operator.mod,
+    ast.USub: operator.neg,
+    ast.UAdd: operator.pos,
+    ast.FloorDiv: operator.floordiv,
+}
+def safe_eval_expr(expr: str, names: dict):
+    """
+    Safely evaluate arithmetic expressions with variable names and whitelisted math funcs.
+    Supports names from `names` (vars_store), numeric literals, math functions.
+    """
+    expr = expr.strip()
+    if not expr:
+        return None
+
+    # parse
+    node = ast.parse(expr, mode='eval')
+
+    def _eval(n):
+        if isinstance(n, ast.Expression):
+            return _eval(n.body)
+        if isinstance(n, ast.Constant):  # Python 3.8+
+            return n.value
+        if isinstance(n, ast.Num):  # older py
+            return n.n
+        if isinstance(n, ast.BinOp):
+            left = _eval(n.left)
+            right = _eval(n.right)
+            op = type(n.op)
+            if op in _ALLOWED_OPERATORS:
+                return _ALLOWED_OPERATORS[op](left, right)
+            raise ValueError(f"Operator {op} not allowed")
+        if isinstance(n, ast.UnaryOp):
+            operand = _eval(n.operand)
+            op = type(n.op)
+            if op in _ALLOWED_OPERATORS:
+                return _ALLOWED_OPERATORS[op](operand)
+            raise ValueError(f"Unary operator {op} not allowed")
+        if isinstance(n, ast.Name):
+            # allow names from provided names dict
+            if n.id in names:
+                return names[n.id]
+            # allow numeric-looking strings? No - return 0 or raise
+            raise ValueError(f"Name '{n.id}' not defined")
+        if isinstance(n, ast.Call):
+            # only allow simple function calls (no attribute calls)
+            if isinstance(n.func, ast.Name):
+                fname = n.func.id
+                if fname in _ALLOWED_MATH_FUNCS:
+                    args = [_eval(a) for a in n.args]
+                    return _ALLOWED_MATH_FUNCS[fname](*args)
+            raise ValueError("Function calls not allowed or not whitelisted")
+        if isinstance(n, ast.Compare):
+            left = _eval(n.left)
+            results = []
+            for op, comparator in zip(n.ops, n.comparators):
+                right = _eval(comparator)
+                if isinstance(op, ast.Eq):
+                    results.append(left == right)
+                elif isinstance(op, ast.NotEq):
+                    results.append(left != right)
+                elif isinstance(op, ast.Gt):
+                    results.append(left > right)
+                elif isinstance(op, ast.GtE):
+                    results.append(left >= right)
+                elif isinstance(op, ast.Lt):
+                    results.append(left < right)
+                elif isinstance(op, ast.LtE):
+                    results.append(left <= right)
+                else:
+                    raise ValueError("Comparison operator not allowed")
+                left = right
+            return all(results)
+        raise ValueError(f"Unsupported AST: {type(n)}")
+
+    return _eval(node)
 
 
 nodes: Dict[int, Dict] = {}  
@@ -41,15 +123,17 @@ def parse_option_line(line: str) -> Optional[Dict]:
     if not raw:
         return None
     parts = [p.strip() for p in raw.split("|")]
-    
+
+    # ensure 4 parts: text | next | condition | actions
     while len(parts) < 4:
         parts.append("")
     text, nxt, cond, acts = parts[0], parts[1], parts[2], parts[3]
-    actions = [a.strip() for a in acts.split(";") if a.strip()] if acts else []
+
+    # actions can be separated by & or ;
+    actions = [a.strip() for a in re.split(r'[&;]', acts) if a.strip()] if acts else []
     cond = cond if cond else None
     nxt = nxt if nxt else None
     return {"text": text, "next": nxt, "condition": cond, "actions": actions}
-
 
 def format_option_line(opt: Dict) -> str:
     acts = ";".join(opt.get("actions", [])) if opt.get("actions") else ""
@@ -58,97 +142,156 @@ def format_option_line(opt: Dict) -> str:
     return f"{opt.get('text','')} | {nxt} | {cond} | {acts}"
 
 def evaluate_condition(cond: Optional[str]) -> bool:
+    """
+    Supports:
+      - multiple conditions joined with & or ;
+      - has_item:NAME / not_has_item:NAME
+      - var:EXPR   (EXPR can be comparisons or math using safe_eval_expr)
+    """
     if not cond:
         return True
-    cond = cond.strip()
-    try:
-        if cond.startswith("has_item:"):
-            name = cond.split(":", 1)[1]
-            return name in inventory
-        if cond.startswith("not_has_item:"):
-            name = cond.split(":", 1)[1]
-            return name not in inventory
-        if cond.startswith("var:"):
-            expr = cond.split(":", 1)[1]
-            if "==" in expr:
-                left, right = expr.split("==", 1)
-                left = left.strip()
-                right = right.strip()
-                val = vars_store.get(left)
-                if right.lower() == "true":
-                    cmp = True
-                elif right.lower() == "false":
-                    cmp = False
+    parts = [p.strip() for p in re.split(r'[&;]', cond) if p.strip()]
+    for part in parts:
+        try:
+            if part.startswith("has_item:"):
+                name = part.split(":", 1)[1].strip()
+                if name not in inventory:
+                    return False
+                continue
+            if part.startswith("not_has_item:"):
+                name = part.split(":", 1)[1].strip()
+                if name in inventory:
+                    return False
+                continue
+            if part.startswith("var:"):
+                expr = part.split(":", 1)[1].strip()
+                # safe_eval_expr handles comparators and returns bool or numeric
+                try:
+                    res = safe_eval_expr(expr, vars_store)
+                except Exception:
+                    return False
+                if isinstance(res, bool):
+                    if not res:
+                        return False
                 else:
-                    try:
-                        cmp = int(right)
-                    except Exception:
-                        try:
-                            cmp = float(right)
-                        except Exception:
-                            cmp = right.strip('"').strip("'")
-                return val == cmp
-            if "!=" in expr:
-                left, right = expr.split("!=", 1)
-                left = left.strip()
-                right = right.strip()
-                val = vars_store.get(left)
-                if right.lower() == "true":
-                    cmp = True
-                elif right.lower() == "false":
-                    cmp = False
-                else:
-                    try:
-                        cmp = int(right)
-                    except Exception:
-                        try:
-                            cmp = float(right)
-                        except Exception:
-                            cmp = right.strip('"').strip("'")
-                return val != cmp
-    except Exception:
-        return False
-    return False
+                    # truthiness for numeric/string
+                    if not res:
+                        return False
+                continue
+            # unknown condition type -> treat as false (safer)
+            return False
+        except Exception:
+            return False
+    return True
 
 def execute_actions(actions: List[str]):
     for act in actions:
-        if act.startswith("set:"):
-            payload = act.split(":", 1)[1]
-            if "=" not in payload:
-                continue
-            name, raw = payload.split("=", 1)
-            name = name.strip(); raw = raw.strip()
-            if raw.lower() == "true":
-                val = True
-            elif raw.lower() == "false":
-                val = False
-            else:
-                try:
-                    val = int(raw)
-                except Exception:
+        if not act:
+            continue
+        subs = [s.strip() for s in re.split(r'[&;]', act) if s.strip()]
+        for sub in subs:
+            try:
+                if sub.startswith("set:"):
+                    payload = sub.split(":", 1)[1]
+                    if "=" not in payload:
+                        continue
+                    name, raw = payload.split("=", 1)
+                    name, raw = name.strip(), raw.strip()
                     try:
-                        val = float(raw)
+                        val = safe_eval_expr(raw, vars_store)
                     except Exception:
-                        val = raw.strip('"').strip("'")
-            vars_store[name] = val
-        elif act.startswith("add_item:"):
-            name = act.split(":",1)[1].strip()
-            if name and name not in inventory:
-                inventory.append(name)
-        elif act.startswith("remove_item:"):
-            name = act.split(":",1)[1].strip()
-            if name in inventory:
-                inventory.remove(name)
-        elif act.startswith("rand_set:"):
-            payload = act.split(":",1)[1]
-            if ":" not in payload:
+                        if raw.lower() == "true":
+                            val = True
+                        elif raw.lower() == "false":
+                            val = False
+                        else:
+                            try:
+                                val = int(raw)
+                            except Exception:
+                                try:
+                                    val = float(raw)
+                                except Exception:
+                                    val = raw.strip('"').strip("'")
+                    vars_store[name] = val
+
+                elif sub.startswith("add_item:"):
+                    name = sub.split(":",1)[1].strip()
+                    if name and name not in inventory:
+                        inventory.append(name)
+
+                elif sub.startswith("remove_item:"):
+                    name = sub.split(":",1)[1].strip()
+                    if name in inventory:
+                        inventory.remove(name)
+
+                elif sub.startswith("rand_set:"):
+                    payload = sub.split(":",1)[1]
+                    if ":" not in payload:
+                        continue
+                    name, opts = payload.split(":",1)
+                    choices = [o.strip() for o in opts.split(",") if o.strip()]
+                    if choices:
+                        vars_store[name.strip()] = random.choice(choices)
+
+                elif sub.startswith("goto:"):
+                    vars_store["__goto"] = sub.split(":",1)[1].strip()
+
+                elif sub.startswith("var:"):
+                    payload = sub.split(":",1)[1].strip()
+                    # match var:x+=expr  var:x=expr etc.
+                    m = re.match(r"^([A-Za-z_][A-Za-z0-9_]*)\s*([\+\-\*/]?=)\s*(.+)$", payload)
+                    if m:
+                        name, op, rhs = m.group(1), m.group(2), m.group(3)
+                        try:
+                            rhs_val = safe_eval_expr(rhs, vars_store)
+                        except Exception:
+                            try:
+                                rhs_val = int(rhs)
+                            except Exception:
+                                try:
+                                    rhs_val = float(rhs)
+                                except Exception:
+                                    rhs_val = rhs.strip('"').strip("'")
+                        cur = vars_store.get(name, 0)
+                        if op == "=":
+                            vars_store[name] = rhs_val
+                        elif op == "+=":
+                            vars_store[name] = (cur or 0) + rhs_val
+                        elif op == "-=":
+                            vars_store[name] = (cur or 0) - rhs_val
+                        elif op == "*=":
+                            vars_store[name] = (cur or 0) * rhs_val
+                        elif op == "/=":
+                            try:
+                                vars_store[name] = (cur or 0) / rhs_val
+                            except Exception:
+                                vars_store[name] = cur
+                    else:
+                        # fallback: var:NAME=RHS or var:NAME (ignored)
+                        if "=" in payload:
+                            name, rhs = payload.split("=",1)
+                            name, rhs = name.strip(), rhs.strip()
+                            try:
+                                val = safe_eval_expr(rhs, vars_store)
+                            except Exception:
+                                val = rhs
+                            vars_store[name] = val
+                        else:
+                            # plain var name - set truthy 1?
+                            vars_store[payload] = vars_store.get(payload, 0)
+
+                else:
+                    # try generic name=val update
+                    if "=" in sub:
+                        name, val_expr = sub.split("=",1)
+                        name, val_expr = name.strip(), val_expr.strip()
+                        try:
+                            vars_store[name] = safe_eval_expr(val_expr, vars_store)
+                        except Exception:
+                            vars_store[name] = val_expr
+            except Exception:
+                # be forgiving: skip failing sub-action
                 continue
-            name, opts = payload.split(":",1)
-            choices = [o.strip() for o in opts.split(",") if o.strip()]
-            if choices:
-                vars_store[name.strip()] = random.choice(choices)
-        elif act.startswith("goto:"):
-            vars_store["__goto"] = act.split(":",1)[1].strip()
 
 def resolve_next(next_ref: Union[int, str]) -> Optional[int]:
     if isinstance(next_ref, int):
@@ -157,10 +300,9 @@ def resolve_next(next_ref: Union[int, str]) -> Optional[int]:
         s = next_ref.strip()
         if not s:
             return None
-        
+
         if "/" in s:
             choices = [part.strip() for part in s.split("/") if part.strip()]
-            
             resolved = []
             for c in choices:
                 try:
@@ -170,7 +312,12 @@ def resolve_next(next_ref: Union[int, str]) -> Optional[int]:
                     try:
                         resolved.append(int(val))
                     except Exception:
-                        continue
+                        try:
+                            # try evaluating expression
+                            ev = safe_eval_expr(c, vars_store)
+                            resolved.append(int(ev))
+                        except Exception:
+                            continue
             if not resolved:
                 return None
             return random.choice(resolved)
@@ -182,7 +329,11 @@ def resolve_next(next_ref: Union[int, str]) -> Optional[int]:
                 try:
                     return int(val)
                 except Exception:
-                    return None
+                    try:
+                        ev = safe_eval_expr(s, vars_store)
+                        return int(ev)
+                    except Exception:
+                        return None
     return None
 
 def create_node(num: int, header: str = "", x: int = 50, y: int = 50, options: Optional[List[Dict]] = None, color: str = '#222222'):
@@ -1565,50 +1716,90 @@ class VisualEditor(tk.Frame):
         self.enter_editor_mode()
 
     def reset_state(self):
-        vars_store.clear(); inventory.clear()
-        #messagebox.showinfo("Reset", "Vars and inventory reset.")
+        vars_store.clear()
+        inventory.clear()
+        defaults = self.vars_list.get("1.0", tk.END).strip().splitlines()
+        for line in defaults:
+            line = line.strip()
+            if not line:
+                continue
+            if line.startswith("inv:"):
+                item = line.split(":", 1)[1].strip()
+                if item:
+                    inventory.append(item)
+            elif "=" in line:
+                name, val = line.split("=", 1)
+                name, val = name.strip(), val.strip()
+                try:
+                    vars_store[name] = safe_eval_expr(val, vars_store)
+                except Exception:
+                    vars_store[name] = val
 
     def play_restart(self):
         self.reset_state()
         self.play_current = START_NODE; self.play_path = []; self.play_render_current()
 
+    @staticmethod
+    def substitute_vars(text: str) -> str:
+        if not text:
+            return ""
+        def repl(match):
+            key = match.group(1)
+            return str(vars_store.get(key, f"{{{key}}}"))
+        return re.sub(r"\{(\w+)\}", repl, text)
+
     def play_render_current(self):
-        
         if vars_store.get("__goto"):
             maybe = vars_store.pop("__goto")
             nxt_try = resolve_next(maybe)
             if nxt_try is not None:
                 self.play_current = nxt_try
+
         if self.play_current not in nodes:
             if self.settings.get('show_path', True):
-                self.play_header.config(text=f"[END] Node {self.play_current} not found. Path: {' -> '.join(map(str,self.play_path))}")
+                self.play_header.config(
+                    text=f"[END] Node {self.play_current} not found. Path: {' -> '.join(map(str,self.play_path))}"
+                )
             else:
                 self.play_header.config(text=f"[END] Node {self.play_current} not found.")
             for w in self.choice_frame.winfo_children():
                 w.destroy()
             return
+
         node = nodes[self.play_current]
         self.play_path.append(self.play_current)
-        self.play_header.config(text=f"{node.get('header','')}")
-        
+
+        header_text = self.substitute_vars(node.get("header", ""))
+        self.play_header.config(text=header_text)
+
         visible = []
-        for opt in node.get("options",[]):
+        for opt in node.get("options", []):
             if evaluate_condition(opt.get("condition")):
                 visible.append(opt)
+
         for w in self.choice_frame.winfo_children():
             w.destroy()
+
         if not visible:
             tk.Label(self.choice_frame, text="[THE END]").pack()
-            if self.settings.get('show_path', True): 
-                tk.Label(self.choice_frame, text="Path: " + " -> ".join(map(str,self.play_path))).pack()
-            btn = tk.Button(self.choice_frame, text="Play Again", command=self.play_restart)
-            btn = tk.Button(self.choice_frame, text="Close Play", command=self.close_play)
-            #tk.Button(ctrl, text="Close Play", command=self.close_play).pack(side=tk.RIGHT)
-            btn.pack(pady=(6,0))
+            if self.settings.get('show_path', True):
+                tk.Label(
+                    self.choice_frame,
+                    text="Path: " + " -> ".join(map(str, self.play_path))
+                ).pack()
+            tk.Button(self.choice_frame, text="Play Again", command=self.play_restart).pack(pady=(6, 0))
+            tk.Button(self.choice_frame, text="Close Play", command=self.close_play).pack(pady=(6, 0))
             return
-        for i,opt in enumerate(visible, start=1):
-            btn = tk.Button(self.choice_frame, text=opt.get("text","choice"), width=50, anchor="w",
-                            command=lambda o=opt: self.play_pick(o))
+
+        for i, opt in enumerate(visible, start=1):
+            opt_text = self.substitute_vars(opt.get("text", "choice"))
+            btn = tk.Button(
+                self.choice_frame,
+                text=opt_text,
+                width=50,
+                anchor="w",
+                command=lambda o=opt: self.play_pick(o)
+            )
             btn.pack(pady=2)
 
     def play_pick(self, opt):
