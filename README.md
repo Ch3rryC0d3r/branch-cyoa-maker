@@ -14,7 +14,7 @@ Branch is a **visual editor + runtime** that lets you build branching narratives
 Use **nodes, conditions, variables, inventory**, and instantly playtest inside the app.
 
 <p align="center">
-  <img src="Interface.png" alt="Editor Screenshot" width="400">
+  <img src="Interface.png" alt="Editor Screenshot">
 </p>
 
 ---
