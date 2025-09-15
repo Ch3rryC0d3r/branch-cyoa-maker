@@ -1,12 +1,13 @@
 """ 
 Branch, a CYOA (Choose-Your-Own-Adventure) Maker.
-Version: v0.5.02.04
+Version: v0.5.02.05
 
 ******************************************To Do******************************************
 @1@ Fix zooming. Calling 'redraw()' never drawed the nodes with sizes based on the 'current_zoom', I've tried before, however, the click detection was offset each time I dragged a node.
 ********************************************************************************************
 
 Changelog:
+v0.5.02.04 - Fixed deletion bugs
 v0.5.02.04 - "(Quick) Add Node" adds the node with the next AVAILABLE id, v0.5.02.03 and since did "max+1".
 v0.5.02.03 - fixed 'search_node' you can now use Ctrl+F type a number then press enter to find a node.
 """
@@ -1397,7 +1398,7 @@ class VisualEditor(tk.Frame):
             self.selected_comment = None
 
     def delete_multi_nodes(self): # delete multiple nodes, happens when multi-selecting nodes.
-        self.push_undo()
+        self.push_undo() # Added for undo functionality
         targets = self.multi_selected_nodes if self.multi_selected_nodes else {self.selected_node}
         if not targets:
             return
@@ -1405,9 +1406,21 @@ class VisualEditor(tk.Frame):
             if not messagebox.askyesno("Delete", f"Delete {len(targets)} node(s)?"):
                 return
         for nid in targets:
-            delete_node(nid)
+            # Delete from the global nodes dictionary
+            if nid in nodes:
+                del nodes[nid]
+            # Delete associated canvas items immediately to prevent visual glitches
+            if nid in self.node_rects:
+                self.canvas.delete(self.node_rects[nid])
+                del self.node_rects[nid]
+            if nid in self.node_texts:
+                self.canvas.delete(self.node_texts[nid])
+                del self.node_texts[nid]
+            if nid in self.node_base_fonts:
+                del self.node_base_fonts[nid]
+
         self.selected_node = None
-        self.multi_selected_nodes.clear()
+        self.multi_selected_nodes.clear() # Ensure this is cleared
         self.redraw()
         self.clear_inspector()
         self.update_node_count()
@@ -1688,10 +1701,17 @@ class VisualEditor(tk.Frame):
         data["handles"] = {}
 
     def redraw(self):
-        seen_edges = set()
-        COLOR1 = self.theme.get('from_lines', '#00ced1')
-        COLOR2 = self.theme.get('to_lines', '#ffa500')
-        RANDOM_EDGE_COLOR = self.theme.get('randomEdgeFromColor', '#8e44ff')
+        # Clear all existing edges
+        for item in self.edge_items:
+            self.canvas.delete(item)
+        self.edge_items.clear()
+
+        # Clear all existing node rectangles and texts, then re-create only for existing nodes
+        for nid in list(self.node_rects.keys()): # Iterate over a copy of keys to allow modification
+            if nid not in nodes:
+                self.canvas.delete(self.node_rects.pop(nid, None))
+                self.canvas.delete(self.node_texts.pop(nid, None))
+                self.node_base_fonts.pop(nid, None)
 
         # --- Update or create nodes ---
         for nid, data in nodes.items():
@@ -1740,10 +1760,11 @@ class VisualEditor(tk.Frame):
                 self.canvas.itemconfig(self.node_rects[nid], outline=self.theme['node_outline'], width=2)
 
         # --- Update edges ---
-        # Delete old edges only once
-        for item in self.edge_items:
-            self.canvas.delete(item)
-        self.edge_items.clear()
+        # (The clearing of old edges is moved to the beginning of the function)
+        seen_edges = set()
+        COLOR1 = self.theme.get('from_lines', '#00ced1')
+        COLOR2 = self.theme.get('to_lines', '#ffa500')
+        RANDOM_EDGE_COLOR = self.theme.get('randomEdgeFromColor', '#8e44ff')
 
         for nid, data in nodes.items():
             x1 = data.get("x", 50) + NODE_W // 2
@@ -1811,9 +1832,15 @@ class VisualEditor(tk.Frame):
 
         # --- Update comments ---
 
-        # clear stale handles from previous frame so they don't accumulate
+        # Clear stale handles from previous frame so they don't accumulate
         for cid in list(comments.keys()):
             self.clear_comment_handles(cid)
+
+        # Clear canvas items for comments that no longer exist
+        for cid_item in list(self.comment_rects.keys()):
+            if cid_item not in comments:
+                self.canvas.delete(self.comment_rects.pop(cid_item, None))
+                self.canvas.delete(self.comment_texts.pop(cid_item, None))
 
         # --- Update comments ---
         for cid, data in comments.items():
@@ -1854,6 +1881,7 @@ class VisualEditor(tk.Frame):
             # Create handles only for the selected comment
             if cid == self.selected_comment:
                 handles = {}
+                # Handles are created relative to the comment's current position and size
                 handles["nw"] = self.canvas.create_rectangle(x-HANDLE_SIZE, y-HANDLE_SIZE, x+HANDLE_SIZE, y+HANDLE_SIZE, fill="#222", tags=(f"handle_{cid}", "nw"))
                 handles["ne"] = self.canvas.create_rectangle(x+w-HANDLE_SIZE, y-HANDLE_SIZE, x+w+HANDLE_SIZE, y+HANDLE_SIZE, fill="#222", tags=(f"handle_{cid}", "ne"))
                 handles["sw"] = self.canvas.create_rectangle(x-HANDLE_SIZE, y+h-HANDLE_SIZE, x+HANDLE_SIZE, y+h+HANDLE_SIZE, fill="#222", tags=(f"handle_{cid}", "sw"))
