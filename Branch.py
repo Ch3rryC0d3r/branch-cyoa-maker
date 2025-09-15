@@ -1,6 +1,6 @@
 """ 
 Branch, a CYOA (Choose-Your-Own-Adventure) Maker.
-Version: v0.5.02.01
+Version: v0.5.02.02
 
 ******************************************To Do******************************************
 @1@ Fix zooming. Calling 'redraw()' never drawed the nodes with sizes based on the 'current_zoom', I've tried before, however, the click detection was offset each time I dragged a node.
@@ -1082,9 +1082,15 @@ class VisualEditor(tk.Frame):
             except Exception as e:
                 print("Failed to load settings:", e)    
         self.themepreset(None)
-            
+                
     def on_exit(self):
-        self.save_settings(); self.save_theme()
+        try:
+            self.close_play()   # stop play mode cleanly
+        except Exception as e:
+            print("close_play failed:", e)
+
+        self.save_settings()
+        self.save_theme()
         self.master.destroy()
 
     def update_settings(self):
@@ -1513,18 +1519,26 @@ class VisualEditor(tk.Frame):
                     vars_store[name]=parsed
         #messagebox.showinfo("Vars", "Vars & inventory applied.")
 
-    def quick_add_node(self, x=None, y=None): # quick add a node (quick add means it adds the latest node ID)
-        w, h = self.canvas.winfo_width(), self.canvas.winfo_height()
-        cx, cy = self.canvas.canvasx(w/2), self.canvas.canvasy(h/2)
-        #print(self.drag_offset[0], self.drag_offset[1])
+    def quick_add_node(self, event=None, x=None, y=None):  
         self.push_undo()
         new_id = max(nodes.keys(), default=0) + 1
-        if x is None: x = cx
-        if y is None: y = cy
-        if self.settings['udtdnc'] == True:
+
+        # Cursor position if event is provided
+        if event is not None:
+            x, y = self.canvas.canvasx(event.x), self.canvas.canvasy(event.y)
+        else:
+            # Fallback: center of canvas
+            if x is None or y is None:
+                w, h = self.canvas.winfo_width(), self.canvas.winfo_height()
+                x, y = self.canvas.canvasx(w / 2), self.canvas.canvasy(h / 2)
+
+        # Color logic
+        if self.settings.get('udtdnc', False):
             color = '#222222'
         else:
             color = self.theme['default_node_color']
+
+        # Create node
         nodes[new_id] = {
             "x": x,
             "y": y,
@@ -1532,11 +1546,12 @@ class VisualEditor(tk.Frame):
             "options": [],
             "color": color     
         }
+
         self.selected_node = new_id
         self.load_selected_into_inspector()
         self.redraw()
         self.update_node_count()
-
+        
     def truncate_text_to_fit(self, text, font, max_w, max_h):
         linespace = font.metrics("linespace")
         max_lines = max(1, max_h // max(1, linespace))
@@ -1943,12 +1958,25 @@ class VisualEditor(tk.Frame):
             self.clear_inspector(True)
             self.redraw()
 
-    def add_comment(self, text="New comment", x=None, y=None):  # add a comment
+    def on_close(self):
+        try:
+            self.close_play()   # cleanup play mode
+        except Exception:
+            pass
+        self.destroy()          # actually close the main window
+
+    def add_comment(self, text="New comment", event=None, x=None, y=None):  
         self.push_undo()
         global comments
-        if x is None or y is None:
-            w, h = self.canvas.winfo_width(), self.canvas.winfo_height()
-            x, y = self.canvas.canvasx(w/2), self.canvas.canvasy(h/2)
+
+        # Cursor position if event is provided
+        if event is not None:
+            x, y = self.canvas.canvasx(event.x), self.canvas.canvasy(event.y)
+        else:
+            # Fallback: center of canvas
+            if x is None or y is None:
+                w, h = self.canvas.winfo_width(), self.canvas.winfo_height()
+                x, y = self.canvas.canvasx(w / 2), self.canvas.canvasy(h / 2)
 
         cid = max(comments.keys(), default=0) + 1
         comments[cid] = {
@@ -2092,6 +2120,9 @@ class VisualEditor(tk.Frame):
         self.play_window = tk.Toplevel(self.master)
         self.play_window.title("Play Mode")
         self.play_window.geometry("480x360")
+
+        self.play_window.protocol("WM_DELETE_WINDOW", self.close_play)       
+
         tk.Label(self.play_window, text=f"Play Mode").pack()
         self.play_area = tk.Frame(self.play_window)
         self.play_area.pack(fill=tk.BOTH, expand=True)
@@ -2103,7 +2134,7 @@ class VisualEditor(tk.Frame):
         ctrl.pack(fill=tk.X)
         tk.Button(ctrl, text="Restart", command=self.play_restart).pack(side=tk.LEFT)
         #tk.Button(ctrl, text="Reset vars/inv", command=self.reset_state).pack(side=tk.LEFT)
-        tk.Button(ctrl, text="Close Play", command=self.close_play).pack(side=tk.RIGHT)
+        #tk.Button(ctrl, text="Close Play", command=self.close_play).pack(side=tk.RIGHT)
         self.play_current = START_NODE
         self.play_path = []
         self.play_render_current()
