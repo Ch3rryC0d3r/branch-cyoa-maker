@@ -1,12 +1,13 @@
 """ 
 Branch, a CYOA (Choose-Your-Own-Adventure) Maker.
-Version: v0.5.02.03
+Version: v0.5.02.04
 
 ******************************************To Do******************************************
 @1@ Fix zooming. Calling 'redraw()' never drawed the nodes with sizes based on the 'current_zoom', I've tried before, however, the click detection was offset each time I dragged a node.
 ********************************************************************************************
 
 Changelog:
+v0.5.02.04 - "(Quick) Add Node" adds the node with the next AVAILABLE id, v0.5.02.03 and since did "max+1".
 v0.5.02.03 - fixed 'search_node' you can now use Ctrl+F type a number then press enter to find a node.
 """
 
@@ -1597,7 +1598,11 @@ class VisualEditor(tk.Frame):
 
     def quick_add_node(self, event=None, x=None, y=None):  
         self.push_undo()
-        new_id = max(nodes.keys(), default=0) + 1
+
+        # Find the lowest available node ID
+        new_id = 1
+        while new_id in nodes:
+            new_id += 1
 
         # Cursor position if event is provided
         if event is not None:
@@ -1627,7 +1632,7 @@ class VisualEditor(tk.Frame):
         self.load_selected_into_inspector()
         self.redraw()
         self.update_node_count()
-        
+
     def truncate_text_to_fit(self, text, font, max_w, max_h):
         linespace = font.metrics("linespace")
         max_lines = max(1, max_h // max(1, linespace))
