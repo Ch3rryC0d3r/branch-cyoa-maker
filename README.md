@@ -89,4 +89,5 @@ goto:5                     # force jump to node 5
 ---
 
 ## 📜 License
-This project is licensed under the [MIT License]([LICENSE](https://opensource.org/license/mit)).  
+This project is licensed under the [MIT License](https://opensource.org/license/mit).
+
