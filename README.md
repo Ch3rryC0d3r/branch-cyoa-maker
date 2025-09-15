@@ -55,6 +55,7 @@ Options follow this format:
 ```text
 Text | NextNodeID | Condition | Actions
 ```
+👉 You can learn more about Leaves (option lines) by checking [this guide](https://github.com/Ch3rryC0d3r/branch-cyoa-maker/blob/main/LeavesDocumentation.html)
 
 ---
 
