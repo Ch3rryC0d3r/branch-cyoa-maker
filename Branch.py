@@ -1,14 +1,18 @@
 """ 
 Branch, a CYOA (Choose-Your-Own-Adventure) Maker.
-Version: v0.5.02.02
+Version: v0.5.02.03
 
 ******************************************To Do******************************************
 @1@ Fix zooming. Calling 'redraw()' never drawed the nodes with sizes based on the 'current_zoom', I've tried before, however, the click detection was offset each time I dragged a node.
 ********************************************************************************************
+
+Changelog:
+v0.5.02.03 - fixed 'search_node' you can now use Ctrl+F type a number then press enter to find a node.
 """
 
 # built-ins
 import os, re, ast, math, json, copy, random, operator
+
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 # tkinter
@@ -1176,22 +1180,94 @@ class VisualEditor(tk.Frame):
 
         self.redraw()
 
+    def center_canvas_on(self, cx, cy):
+        """Center the canvas view so that canvas coordinate (cx,cy) ends up in the viewport center."""
+        # ensure geometry & items are up to date
+        self.canvas.update_idletasks()
+
+        canvas_w = self.canvas.winfo_width()
+        canvas_h = self.canvas.winfo_height()
+
+        bbox = self.canvas.bbox("all")
+        if not bbox:
+            return
+
+        left, top, right, bottom = bbox
+        total_w = right - left
+        total_h = bottom - top
+
+        # make sure scrollregion matches actual content bbox so fractions are computed consistently
+        try:
+            # configure accepts a tuple fine
+            self.canvas.configure(scrollregion=(left, top, right, bottom))
+        except Exception:
+            # ignore if configure fails for some reason
+            pass
+
+        # target top-left of view so (cx,cy) becomes centered
+        target_left = cx - (canvas_w / 2)
+        target_top  = cy - (canvas_h / 2)
+
+        # compute maximum scrollable offset (in canvas coords)
+        max_x = max(0.0, total_w - canvas_w)
+        max_y = max(0.0, total_h - canvas_h)
+
+        # convert target_left/top into a fraction [0..1] relative to bbox left/top
+        if max_x > 0.0:
+            frac_x = (target_left - left) / max_x
+        else:
+            frac_x = 0.0
+
+        if max_y > 0.0:
+            frac_y = (target_top - top) / max_y
+        else:
+            frac_y = 0.0
+
+        # clamp
+        frac_x = max(0.0, min(1.0, frac_x))
+        frac_y = max(0.0, min(1.0, frac_y))
+
+        self.canvas.xview_moveto(frac_x)
+        self.canvas.yview_moveto(frac_y)
+
     def search_node(self, event=None):
+        """Search node by id (from self.search_var), select it and center on it."""
         nid_str = self.search_var.get().strip()
         if not nid_str.isdigit():
             return
         nid = int(nid_str)
-        if nid in nodes:
-            self.selected_node = nid
-            self.load_selected_into_inspector()
-            self.redraw()
-            
-            x = nodes[nid]["x"]
-            y = nodes[nid]["y"]
-            self.canvas.xview_moveto(max(0, (x-200)/self.canvas.winfo_width()))
-            self.canvas.yview_moveto(max(0, (y-100)/self.canvas.winfo_height()))
-        #self.canvas.scale("all", 0, 0, self.current_zoom, self.current_zoom)
-            
+        if nid not in nodes:
+            return
+
+        # select & show in inspector
+        self.selected_node = nid
+        self.load_selected_into_inspector()
+        # redraw so the node rect/text exist with correct coords
+        self.redraw()
+
+        # make sure canvas geometry is ready
+        self.canvas.update_idletasks()
+
+        node = nodes[nid]
+        # nodes store top-left x,y — center on node center
+        cx = node.get("x", 50) + (NODE_W / 2)
+        cy = node.get("y", 50) + (NODE_H / 2)
+
+        # center (this will also set scrollregion to bbox("all") internally)
+        self.center_canvas_on(cx, cy)
+
+        # optional: flash a highlight rectangle so it's obvious which node was found
+        try:
+            hl = self.canvas.create_rectangle(
+                node.get("x",50), node.get("y",50),
+                node.get("x",50) + NODE_W, node.get("y",50) + NODE_H,
+                outline=self.theme.get('node_selected_outline', '#00ff00'),
+                width=3, tags=("search_highlight",)
+            )
+            self.canvas.after(800, lambda: self.canvas.delete(hl))
+        except Exception:
+            pass
+
     def multi_select_start(self, event): # start multi-selection.
         self.multi_select_start_pos = (self.canvas.canvasx(event.x), self.canvas.canvasy(event.y))
         self.multi_selected_nodes.clear()
