@@ -13,6 +13,10 @@
 Branch is a **visual editor + runtime** that lets you build branching narratives — no heavy coding needed.  
 Use **nodes, conditions, variables, inventory**, and instantly playtest inside the app.
 
+<p align="center">
+  <img src="Interface.png" alt="Editor Screenshot" width="400">
+</p>
+
 ---
 
 ## ⚡ Features
@@ -88,9 +92,6 @@ goto:5                     # force jump to node 5
 - Load: `App → Load` → pick a JSON file  
 
 ---
-
-## Here's how it looks up-and-running:
-![Editor Screenshot](Interface.png)
 
 ## 📜 License
 This project is licensed under the [MIT License](https://opensource.org/license/mit).
