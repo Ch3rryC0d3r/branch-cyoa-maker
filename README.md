@@ -61,12 +61,12 @@ Text | NextNodeID | Condition | Actions
 ### Conditions
 ```text
 has_item:sword       # requires sword in inventory
-var:gold==10         # requires gold == 10
+var:gold==10 (or 'gold==10')        # requires gold == 10
 ```
 
 ### Actions
 ```text
-set:gold=5                # set variable
+set:gold=5 (or gold=5)     # set variable
 add_item:sword             # add to inventory
 remove_item:sword          # remove from inventory
 rand_set:mood:happy,sad    # random choice
@@ -79,26 +79,12 @@ goto:5                     # force jump to node 5
 - Switch to **Play Mode** (toolbar button)  
 - Choices are displayed as buttons  
 - Restart or close play mode anytime  
-
+(Located at the very top-right)
 ---
 
 ### Saving & Loading
 - Save: `App → Save (Ctrl+S)` → saves to `./saves/your_story.json`  
 - Load: `App → Load` → pick a JSON file  
-
----
-
-## 📂 Repo Structure
-
-```text
-branch-cyoa-maker/
-├── Branch.py          # main application
-├── saves/             # story save files
-├── settings.json      # user settings (auto-created)
-├── theme.json         # theme presets (auto-created)
-├── LICENSE
-└── README.md
-```
 
 ---
 
