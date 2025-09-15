@@ -6,13 +6,13 @@ Branch, a CYOA (Choose-Your-Own-Adventure) Maker.
 ********************************************************************************************
 """
 
-# imports and whatnot
-import json, random, os, ast, math, operator, re
-from typing import Any
-import tkinter as tk
-from tkinter import filedialog, messagebox, simpledialog
+# built-ins
+import os, re, ast, math, json, copy, random, operator
 from typing import Any, Dict, List, Optional, Tuple, Union
-import tkinter.colorchooser as colorchooser
+
+# tkinter
+import tkinter as tk
+from tkinter import filedialog, messagebox, simpledialog, colorchooser
 import tkinter.font as tkFont
 import tkinter.ttk as ttk
 
@@ -435,6 +435,12 @@ class VisualEditor(tk.Frame):
         self.undo_stack = [] # undo stack, or 'undo list'
         self.theme = {} # define 'self.theme' for later use
 
+        # --- comment system state ---
+        self.selected_comment = None
+        self.resizing_comment = False
+        self.comment_rects = {}
+        self.comment_texts = {}
+        
         # load theme.json if existing, otherwise, load 'default' theme.
         if not os.path.exists(THEME_PATH):
             self.themepreset('default')
@@ -1101,49 +1107,68 @@ class VisualEditor(tk.Frame):
 
     def push_undo(self):
         state = {
-            "nodes": json.loads(json.dumps(nodes)),
+            "nodes": copy.deepcopy(nodes),
             "vars": vars_store.copy(),
-            "inventory": inventory.copy()
+            "inventory": inventory.copy(),
+            "comments": copy.deepcopy(comments),
+            "selected_node": self.selected_node,
+            "selected_comment": self.selected_comment
         }
         self.undo_stack.append(state)
-        self.redo_stack.clear()  
+        self.redo_stack.clear()
 
     def undo(self):
-        global nodes, vars_store, inventory        
+        global nodes, vars_store, inventory, comments
         if not self.undo_stack:
             return
+        
+        # save current state to redo
         self.redo_stack.append({
-            "nodes": json.loads(json.dumps(nodes)),
+            "nodes": copy.deepcopy(nodes),
             "vars": vars_store.copy(),
-            "inventory": inventory.copy()
+            "inventory": inventory.copy(),
+            "comments": copy.deepcopy(comments),
+            "selected_node": self.selected_node,
+            "selected_comment": self.selected_comment
         })
+
+        # restore undo state
         state = self.undo_stack.pop()
-        nodes = {int(k):v for k,v in state["nodes"].items()}
+        nodes = {int(k): v for k, v in state["nodes"].items()}
         vars_store = state["vars"]
         inventory[:] = state["inventory"]
-        self.selected_node = None
+        comments = {int(k): v for k, v in state["comments"].items()}
+        self.selected_node = state["selected_node"]
+        self.selected_comment = state["selected_comment"]
+
         self.redraw()
 
     def redo(self):
-        global nodes, vars_store, inventory        
+        global nodes, vars_store, inventory, comments
         if not self.redo_stack:
             return
         
-        state_current = {
-            "nodes": json.loads(json.dumps(nodes)),
+        # save current state to undo
+        self.undo_stack.append({
+            "nodes": copy.deepcopy(nodes),
             "vars": vars_store.copy(),
-            "inventory": inventory.copy()
-        }
-        self.undo_stack.append(state_current)
+            "inventory": inventory.copy(),
+            "comments": copy.deepcopy(comments),
+            "selected_node": self.selected_node,
+            "selected_comment": self.selected_comment
+        })
 
-        
+        # restore redo state
         state = self.redo_stack.pop()
-        nodes = {int(k):v for k,v in state["nodes"].items()}
+        nodes = {int(k): v for k, v in state["nodes"].items()}
         vars_store = state["vars"]
         inventory[:] = state["inventory"]
-        self.selected_node = None
+        comments = {int(k): v for k, v in state["comments"].items()}
+        self.selected_node = state["selected_node"]
+        self.selected_comment = state["selected_comment"]
+
         self.redraw()
-   
+
     def search_node(self, event=None):
         nid_str = self.search_var.get().strip()
         if not nid_str.isdigit():
@@ -1513,10 +1538,11 @@ class VisualEditor(tk.Frame):
 
     def truncate_text_to_fit(self, text, font, max_w, max_h):
         linespace = font.metrics("linespace")
-        max_lines = max_h // linespace
+        max_lines = max(1, max_h // max(1, linespace))
         words = text.split(' ')
         lines = []
         current_line = ""
+        truncated = False
 
         for word in words:
             test_line = (current_line + " " + word).strip() if current_line else word
@@ -1526,20 +1552,29 @@ class VisualEditor(tk.Frame):
                 lines.append(current_line)
                 current_line = word
                 if len(lines) >= max_lines:
+                    truncated = True
                     break
 
-        if current_line and len(lines) < max_lines:
-            lines.append(current_line)
+        if current_line:
+            if len(lines) < max_lines:
+                lines.append(current_line)
+            else:
+                truncated = True
 
-        # Truncate last line with ellipsis if needed
         if len(lines) > max_lines:
             lines = lines[:max_lines]
+            truncated = True
 
+        # final check: last line too wide?
         if lines:
             last_line = lines[-1]
-            while font.measure(last_line + "…") > max_w and last_line:
-                last_line = last_line[:-1]
-            lines[-1] = last_line + "…" if last_line else "…"
+            if font.measure(last_line) > max_w:
+                truncated = True
+
+            if truncated:
+                while font.measure(last_line + "…") > max_w and last_line:
+                    last_line = last_line[:-1]
+                lines[-1] = last_line + "…" if last_line else "…"
 
         return "\n".join(lines)
 
@@ -1907,14 +1942,21 @@ class VisualEditor(tk.Frame):
             self.clear_inspector(True)
             self.redraw()
 
-
-    def add_comment(self, text="New comment", x=None, y=None): # add a comment
+    def add_comment(self, text="New comment", x=None, y=None):  # add a comment
+        self.push_undo()
         global comments
         if x is None or y is None:
             w, h = self.canvas.winfo_width(), self.canvas.winfo_height()
             x, y = self.canvas.canvasx(w/2), self.canvas.canvasy(h/2)
+
         cid = max(comments.keys(), default=0) + 1
-        comments[cid] = {"text": text, "x": x, "y": y}
+        comments[cid] = {
+            "text": text,
+            "x": x,
+            "y": y,
+            "w": COMMENT_W,
+            "h": COMMENT_H
+        }
         self.selected_comment = cid
         self.redraw()
 
