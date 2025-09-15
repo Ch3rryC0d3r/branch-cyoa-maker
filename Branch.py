@@ -3,8 +3,6 @@ Branch, a CYOA (Choose-Your-Own-Adventure) Maker.
 
 ******************************************To Do******************************************
 @1@ Fix zooming. Calling 'redraw()' never drawed the nodes with sizes based on the 'current_zoom', I've tried before, however, the click detection was offset each time I dragged a node.
-@2@ Fix comments. Comments will not change text based on the 'Comment Text' in the ("Node") Inspector, I should make it where it changes text based on 'header_text' instead, aswell as make the resize handles only render when that comment is selected. 
-
 ********************************************************************************************
 """
 
@@ -108,6 +106,7 @@ START_NODE = 1
 BASE_FONT_SIZE = 11
 SETTINGS_PATH = "./settings.json"
 THEME_PATH = "./theme.json"
+MIN_W, MIN_H = 30, 20 # minimum size for comments
 
 # A "LEAF" is simply a name for an option line in the Node Inspector.
 
@@ -628,7 +627,6 @@ class VisualEditor(tk.Frame):
         preset_canvas.config(scrollregion=preset_canvas.bbox("all"))
 
         # Canvas Keybinds
-        self.canvas.bind("<Double-Button-1>", self.canvas_double_click)
         self.canvas.bind("<ButtonPress-2>", self.start_pan)
         self.canvas.bind("<B2-Motion>", self.do_pan)
         self.canvas.tag_bind("node", "<Button-3>", self.node_right_click)
@@ -638,6 +636,7 @@ class VisualEditor(tk.Frame):
         self.canvas.bind("<ButtonPress-1>", self.start_resize, add="+")
         self.canvas.bind("<B1-Motion>", self.do_resize, add="+")
         self.canvas.bind("<ButtonRelease-1>", self.stop_resize, add="+")
+        self.canvas.tag_bind("comment", "<Button-3>", self.comment_right_click)
         self.canvas.bind("<ButtonPress-1>", self.start_canvas_or_comment, add="+")  # move comments
         self.canvas.bind("<ButtonPress-1>", self.canvas_mouse_down, add="+")        # move nodes
         self.canvas.bind("<B1-Motion>", self.canvas_mouse_move, add="+")
@@ -645,7 +644,7 @@ class VisualEditor(tk.Frame):
 
         # Auto-application stuff
         self.updating = False
-        for t in (self.header_text, self.options_text, self.vars_list):#, self.comment_textbox):
+        for t in (self.header_text, self.options_text, self.vars_list):
             t.bind("<<Modified>>", self._on_modified)
             t.bind("<FocusOut>", self._on_focus_out)
 
@@ -686,7 +685,7 @@ class VisualEditor(tk.Frame):
     def apply_comment_text(self):
         if self.selected_comment is None:
             return
-        new_text = self.comment_textbox.get("1.0", tk.END).strip()
+        new_text = self.header_text.get("1.0", tk.END).strip()
         comments[self.selected_comment]["text"] = new_text
         self.redraw()
 
@@ -724,20 +723,19 @@ class VisualEditor(tk.Frame):
             return
         w = event.widget
         if w.edit_modified():
-            if w == self.comment_textbox:
-                self.apply_comment_text()
-            else:
+            if self.selected_comment is not None:
+                self.apply_comment_edits()
+            elif self.selected_node is not None:
                 self.apply_edits()
-                self.apply_vars_text()
+            self.apply_vars_text()  # always apply vars if needed
             w.edit_modified(False)
 
     def _on_focus_out(self, event):
-        w = event.widget
-        if w == self.comment_textbox:
-            self.apply_comment_text()
-        else:
+        if self.selected_comment is not None:
+            self.apply_comment_edits()
+        elif self.selected_node is not None:
             self.apply_edits()
-            self.apply_vars_text()
+        self.apply_vars_text()
 
     def themepreset(self, preset: str, changetype=None):
         if preset:
@@ -1233,6 +1231,34 @@ class VisualEditor(tk.Frame):
         menu.tk_popup(event.x_root, event.y_root)
         return "break"
 
+    def comment_right_click(self, event):
+        cx = self.canvas.canvasx(event.x)
+        cy = self.canvas.canvasy(event.y)
+        clicked = self.canvas.find_overlapping(cx, cy, cx, cy)
+        clicked_comment = None
+
+        for item in clicked:
+            for t in self.canvas.gettags(item):
+                if t.startswith("comment"):
+                    # tags look like ("comment", "3"), so grab second tag
+                    for tag in self.canvas.gettags(item):
+                        if tag.isdigit():
+                            clicked_comment = int(tag)
+                            break
+            if clicked_comment is not None:
+                break
+
+        if clicked_comment is None:
+            return "break"
+
+        self.selected_comment = clicked_comment
+
+        menu = tk.Menu(self, tearoff=0)
+        menu.add_command(label="Delete", command=lambda: self.delete_comment(clicked_comment))
+
+        menu.tk_popup(event.x_root, event.y_root)
+        return "break"
+
     def background_right_click(self, event): # this is called when you right-click the background.
         cx, cy = self.canvas.canvasx(event.x), self.canvas.canvasy(event.y)
         clicked = self.canvas.find_overlapping(cx, cy, cx, cy)
@@ -1242,6 +1268,24 @@ class VisualEditor(tk.Frame):
 
         self.bg_menu.tk_popup(event.x_root, event.y_root)
         return "break"
+
+    def delete_comment(self, cid):
+        if cid not in comments:
+            return
+        # clear handles, canvas items, and stored refs
+        self.clear_comment_handles(cid)
+        if hasattr(self, "comment_rects") and cid in self.comment_rects:
+            try: self.canvas.delete(self.comment_rects[cid])
+            except: pass
+            del self.comment_rects[cid]
+        if hasattr(self, "comment_texts") and cid in self.comment_texts:
+            try: self.canvas.delete(self.comment_texts[cid])
+            except: pass
+            del self.comment_texts[cid]
+        # finally remove from the dict
+        del comments[cid]
+        if self.selected_comment == cid:
+            self.selected_comment = None
 
     def delete_multi_nodes(self): # delete multiple nodes, happens when multi-selecting nodes.
         self.push_undo()
@@ -1466,72 +1510,147 @@ class VisualEditor(tk.Frame):
         self.load_selected_into_inspector()
         self.redraw()
         self.update_node_count()
-    
-    def redraw(self): # redraw everything on canvas
-        self.canvas.delete("all")
-        self.node_rects.clear()
-        self.node_texts.clear()
-        self.edge_items.clear()
 
+    def truncate_text_to_fit(self, text, font, max_w, max_h):
+        linespace = font.metrics("linespace")
+        max_lines = max_h // linespace
+        words = text.split(' ')
+        lines = []
+        current_line = ""
+
+        for word in words:
+            test_line = (current_line + " " + word).strip() if current_line else word
+            if font.measure(test_line) <= max_w:
+                current_line = test_line
+            else:
+                lines.append(current_line)
+                current_line = word
+                if len(lines) >= max_lines:
+                    break
+
+        if current_line and len(lines) < max_lines:
+            lines.append(current_line)
+
+        # Truncate last line with ellipsis if needed
+        if len(lines) > max_lines:
+            lines = lines[:max_lines]
+
+        if lines:
+            last_line = lines[-1]
+            while font.measure(last_line + "…") > max_w and last_line:
+                last_line = last_line[:-1]
+            lines[-1] = last_line + "…" if last_line else "…"
+
+        return "\n".join(lines)
+
+    def clear_comment_handles(self, cid):
+        data = comments.get(cid)
+        if not data:
+            return
+        handles = data.get("handles") or {}
+        for hid in list(handles.values()):
+            try:
+                self.canvas.delete(hid)
+            except Exception:
+                pass
+        data["handles"] = {}
+
+    def redraw(self):
         seen_edges = set()
-        if 'from_lines' in self.theme:
-            COLOR1 = self.theme['from_lines']
-        else:
-            COLOR1 = '#00ced1'
-        if 'to_lines' in self.theme:
-            COLOR2 = self.theme['to_lines']
-        else:
-            COLOR2 = '#ffa500'
+        COLOR1 = self.theme.get('from_lines', '#00ced1')
+        COLOR2 = self.theme.get('to_lines', '#ffa500')
         RANDOM_EDGE_COLOR = self.theme.get('randomEdgeFromColor', '#8e44ff')
-            
+
+        # --- Update or create nodes ---
+        for nid, data in nodes.items():
+            x = data.get("x", 50)
+            y = data.get("y", 50)
+            node_color = data.get("color", self.theme['default_node_color'])
+
+            # Node rectangle
+            if nid in self.node_rects:
+                self.canvas.coords(self.node_rects[nid], x, y, x + NODE_W, y + NODE_H)
+                self.canvas.itemconfig(self.node_rects[nid], fill=node_color)
+            else:
+                rect = self.canvas.create_rectangle(
+                    x, y, x + NODE_W, y + NODE_H,
+                    fill=node_color, outline=self.theme['node_outline'], width=2,
+                    tags=("node", str(nid))
+                )
+                self.node_rects[nid] = rect
+
+            # Node text
+            font_obj = self.node_base_fonts.get(nid) or tkFont.Font(family="TkDefaultFont", size=11)
+            self.node_base_fonts[nid] = font_obj
+            full_text = f"{nid}: {data.get('header','')}"
+            display_text = self.truncate_text_to_fit(full_text, font_obj, NODE_W-12, NODE_H-4)
+
+            if nid in self.node_texts:
+                self.canvas.itemconfig(self.node_texts[nid], text=display_text)
+                self.canvas.coords(self.node_texts[nid], x + 10, y + 10)
+            else:
+                txt = self.canvas.create_text(
+                    x + 10, y + 10, anchor="nw",
+                    text=display_text,
+                    fill=self.theme['node_text_fill'],
+                    width=NODE_W - 12,
+                    font=font_obj,
+                    tags=("node_text", str(nid))
+                )
+                self.node_texts[nid] = txt
+
+            # Selection outlines
+            if nid == self.selected_node:
+                self.canvas.itemconfig(self.node_rects[nid], outline=self.theme['node_selected_outline'], width=3)
+            elif nid in self.multi_selected_nodes:
+                self.canvas.itemconfig(self.node_rects[nid], outline=self.theme['multi_selected_outline'], width=3)
+            else:
+                self.canvas.itemconfig(self.node_rects[nid], outline=self.theme['node_outline'], width=2)
+
+        # --- Update edges ---
+        # Delete old edges only once
+        for item in self.edge_items:
+            self.canvas.delete(item)
+        self.edge_items.clear()
 
         for nid, data in nodes.items():
             x1 = data.get("x", 50) + NODE_W // 2
             y1 = data.get("y", 50) + NODE_H // 2
-
             for opt in data.get("options", []):
                 nxt_raw = opt.get("next")
-                is_multi_choice = isinstance(nxt_raw, str) and "/" in nxt_raw
                 if not nxt_raw:
                     continue
-
+                is_multi_choice = isinstance(nxt_raw, str) and "/" in nxt_raw
                 next_nodes = []
+
                 if isinstance(nxt_raw, str) and "/" in nxt_raw:
                     for part in nxt_raw.split("/"):
-                        part = part.strip()
                         try:
-                            next_nodes.append(int(part))
+                            next_nodes.append(int(part.strip()))
                         except:
-                            val = vars_store.get(part)
+                            val = vars_store.get(part.strip())
                             if val is not None:
-                                try:
-                                    next_nodes.append(int(val))
-                                except:
-                                    pass
+                                try: next_nodes.append(int(val))
+                                except: pass
                 else:
                     try:
                         next_nodes.append(int(nxt_raw))
                     except:
                         val = vars_store.get(nxt_raw)
                         if val is not None:
-                            try:
-                                next_nodes.append(int(val))
-                            except:
-                                pass
+                            try: next_nodes.append(int(val))
+                            except: pass
 
                 for tgt in next_nodes:
                     if tgt not in nodes or (nid, tgt) in seen_edges:
                         continue
-
                     x2 = nodes[tgt].get("x", 50) + NODE_W // 2
                     y2 = nodes[tgt].get("y", 50) + NODE_H // 2
 
-                    
                     reverse_exists = False
                     for ropt in nodes[tgt].get("options", []):
                         rnext = ropt.get("next")
-                        if rnext is None:
-                            continue
+                        if rnext is None: continue
                         if isinstance(rnext, str) and "/" in rnext:
                             if str(nid) in [p.strip() for p in rnext.split("/")]:
                                 reverse_exists = True
@@ -1541,11 +1660,9 @@ class VisualEditor(tk.Frame):
                                 reverse_exists = True
                                 break
 
+                    from_color = RANDOM_EDGE_COLOR if is_multi_choice else COLOR1
                     if reverse_exists:
-                        from_color = RANDOM_EDGE_COLOR if is_multi_choice else COLOR1
-                        line = self.canvas.create_line(
-                            x1, y1, x2, y2, width=3, fill=from_color, smooth=True
-                        )
+                        line = self.canvas.create_line(x1, y1, x2, y2, width=3, fill=from_color, smooth=True)
                         self.edge_items.append(line)
                         self.canvas.tag_lower(line)
                         seen_edges.add((nid, tgt))
@@ -1553,79 +1670,68 @@ class VisualEditor(tk.Frame):
                     else:
                         mid_x = (x1 + x2) / 2
                         mid_y = (y1 + y2) / 2
-
-                        from_color = RANDOM_EDGE_COLOR if is_multi_choice else COLOR1
-                        line1 = self.canvas.create_line(
-                            x1, y1, mid_x, mid_y, width=3, fill=from_color, smooth=True
-                        )
-                        line2 = self.canvas.create_line(
-                            mid_x, mid_y, x2, y2, width=3, fill=COLOR2, smooth=True, arrow=tk.LAST
-                        )
+                        line1 = self.canvas.create_line(x1, y1, mid_x, mid_y, width=3, fill=from_color, smooth=True)
+                        line2 = self.canvas.create_line(mid_x, mid_y, x2, y2, width=3, fill=COLOR2, smooth=True, arrow=tk.LAST)
                         self.edge_items.extend([line1, line2])
                         self.canvas.tag_lower(line1)
                         self.canvas.tag_lower(line2)
                         seen_edges.add((nid, tgt))
 
-        
-        for nid, data in nodes.items():
-            x = data.get("x", 50)
-            y = data.get("y", 50)
-            node_color = data.get("color", self.theme['default_node_color'])
+        # --- Update comments ---
 
-            rect = self.canvas.create_rectangle(
-                x, y, x + NODE_W, y + NODE_H,
-                fill=node_color, outline=self.theme['node_outline'], width=2,
-                tags=("node", str(nid))
-            )
-            font_obj = tkFont.Font(family="TkDefaultFont", size=11)
-            txt = self.canvas.create_text(
-                x + 10, y + 10, anchor="nw",
-                text=f"{nid}: {data.get('header','')}", fill=self.theme['node_text_fill'],
-                width=NODE_W - 12, font=font_obj, tags=("node_text", str(nid))
-            )
-            self.node_base_fonts[nid] = font_obj
-            self.node_rects[nid] = rect
-            self.node_texts[nid] = txt
+        # clear stale handles from previous frame so they don't accumulate
+        for cid in list(comments.keys()):
+            self.clear_comment_handles(cid)
 
-            if nid == self.selected_node:
-                self.canvas.itemconfig(rect, outline=self.theme['node_selected_outline'], width=3)
-            elif nid in self.multi_selected_nodes:
-                self.canvas.itemconfig(rect, outline=self.theme['multi_selected_outline'], width=3)
-        
+        # --- Update comments ---
         for cid, data in comments.items():
             x, y = data["x"], data["y"]
-            w, h = data.get("w", COMMENT_W), data.get("h", COMMENT_H)
+            w, h = max(30, data.get("w", COMMENT_W)), max(20, data.get("h", COMMENT_H))
+            data["w"], data["h"] = w, h
 
-            # Rectangle with fake transparency
-            rect_id = self.canvas.create_rectangle(
-                x, y, x + w, y + h,
-                fill="#FFA500", outline="#FFCC66", width=2,
-               # stipple="gray50",  # semi-transparent effect
-                tags=("comment", str(cid))
-            )
+            # Rectangle (reuse if exists)
+            if cid in getattr(self, "comment_rects", {}):
+                self.canvas.coords(self.comment_rects[cid], x, y, x + w, y + h)
+            else:
+                if not hasattr(self, "comment_rects"):
+                    self.comment_rects = {}
+                rect_id = self.canvas.create_rectangle(
+                    x, y, x + w, y + h,
+                    fill="#FFA500", outline="#FFCC66", width=2,
+                    tags=("comment", str(cid))
+                )
+                self.comment_rects[cid] = rect_id
 
-            # Text inside rectangle
-            text_id = self.canvas.create_text(
-                x + 5, y + 5, anchor="nw",
-                text=data["text"], font=("Arial", 10), fill="#333333",
-                width=w - 10,
-                tags=("comment_text", str(cid))
-            )
+            # Text (truncated)
+            font_obj = tkFont.Font(family="Arial", size=10)
+            display_text = self.truncate_text_to_fit(data.get("text",""), font_obj, w-10, h-10)
 
-            # Corner handles
+            if cid in getattr(self, "comment_texts", {}):
+                self.canvas.itemconfig(self.comment_texts[cid], text=display_text)
+                self.canvas.coords(self.comment_texts[cid], x + 5, y + 5)
+            else:
+                if not hasattr(self, "comment_texts"):
+                    self.comment_texts = {}
+                text_id = self.canvas.create_text(
+                    x + 5, y + 5, anchor="nw", text=display_text,
+                    font=font_obj, width=w-10, fill="#333333",
+                    tags=("comment_text", str(cid))
+                )
+                self.comment_texts[cid] = text_id
+
+            # Create handles only for the selected comment
             if cid == self.selected_comment:
-                handles = {
-                    "nw": self.canvas.create_rectangle(x-HANDLE_SIZE, y-HANDLE_SIZE, x+HANDLE_SIZE, y+HANDLE_SIZE, fill="#222", tags=(f"handle_{cid}", "nw")),
-                    "ne": self.canvas.create_rectangle(x+w-HANDLE_SIZE, y-HANDLE_SIZE, x+w+HANDLE_SIZE, y+HANDLE_SIZE, fill="#222", tags=(f"handle_{cid}", "ne")),
-                    "sw": self.canvas.create_rectangle(x-HANDLE_SIZE, y+h-HANDLE_SIZE, x+HANDLE_SIZE, y+h+HANDLE_SIZE, fill="#222", tags=(f"handle_{cid}", "sw")),
-                    "se": self.canvas.create_rectangle(x+w-HANDLE_SIZE, y+h-HANDLE_SIZE, x+w+HANDLE_SIZE, y+h+HANDLE_SIZE, fill="#222", tags=(f"handle_{cid}", "se")),
-                }
-            data["handles"] = handles
-            data["rect_id"] = rect_id
-            data["text_id"] = text_id
-            data["w"] = w
-            data["h"] = h
-            
+                handles = {}
+                handles["nw"] = self.canvas.create_rectangle(x-HANDLE_SIZE, y-HANDLE_SIZE, x+HANDLE_SIZE, y+HANDLE_SIZE, fill="#222", tags=(f"handle_{cid}", "nw"))
+                handles["ne"] = self.canvas.create_rectangle(x+w-HANDLE_SIZE, y-HANDLE_SIZE, x+w+HANDLE_SIZE, y+HANDLE_SIZE, fill="#222", tags=(f"handle_{cid}", "ne"))
+                handles["sw"] = self.canvas.create_rectangle(x-HANDLE_SIZE, y+h-HANDLE_SIZE, x+HANDLE_SIZE, y+h+HANDLE_SIZE, fill="#222", tags=(f"handle_{cid}", "sw"))
+                handles["se"] = self.canvas.create_rectangle(x+w-HANDLE_SIZE, y+h-HANDLE_SIZE, x+w+HANDLE_SIZE, y+h+HANDLE_SIZE, fill="#222", tags=(f"handle_{cid}", "se"))
+                data["handles"] = handles
+            else:
+                # ensure no handles stored for unselected comments
+                data["handles"] = {}
+
+
     def select_comment(self, event): # selects a comment
         x, y = self.canvas.canvasx(event.x), self.canvas.canvasy(event.y)
         for cid, data in comments.items():
@@ -1635,11 +1741,12 @@ class VisualEditor(tk.Frame):
                 self.load_comment_into_inspector()
                 break
 
-    def load_comment_into_inspector(self): # loads comment info into inspector
-        if self.selected_comment is None: return
-        c = comments[self.selected_comment]
+    def load_comment_into_inspector(self):
+        if self.selected_comment is None: 
+            return
+        comment = comments[self.selected_comment]
         self.header_text.delete("1.0", tk.END)
-        self.header_text.insert(tk.END, c["text"])
+        self.header_text.insert(tk.END, comment["text"])
 
     def apply_comment_edits(self): # apply comment edits to the comment
         if self.selected_comment is None: return
@@ -1690,21 +1797,29 @@ class VisualEditor(tk.Frame):
         comment = comments[cid]
 
         if "nw" in self.resize_dir:
-            comment["x"] = x0 + dx
-            comment["y"] = y0 + dy
-            comment["w"] = w - dx
-            comment["h"] = h - dy
+            new_w = max(w - dx, MIN_W)
+            new_h = max(h - dy, MIN_H)
+            comment["x"] = x0 + (w - new_w)
+            comment["y"] = y0 + (h - new_h)
+            comment["w"] = new_w
+            comment["h"] = new_h
         elif "ne" in self.resize_dir:
-            comment["y"] = y0 + dy
-            comment["w"] = w + dx
-            comment["h"] = h - dy
+            new_w = max(w + dx, MIN_W)
+            new_h = max(h - dy, MIN_H)
+            comment["y"] = y0 + (h - new_h)
+            comment["w"] = new_w
+            comment["h"] = new_h
         elif "sw" in self.resize_dir:
-            comment["x"] = x0 + dx
-            comment["w"] = w - dx
-            comment["h"] = h + dy
+            new_w = max(w - dx, MIN_W)
+            new_h = max(h + dy, MIN_H)
+            comment["x"] = x0 + (w - new_w)
+            comment["w"] = new_w
+            comment["h"] = new_h
         elif "se" in self.resize_dir:
-            comment["w"] = w + dx
-            comment["h"] = h + dy
+            new_w = max(w + dx, MIN_W)
+            new_h = max(h + dy, MIN_H)
+            comment["w"] = new_w
+            comment["h"] = new_h
 
         self.redraw()
 
@@ -1715,15 +1830,21 @@ class VisualEditor(tk.Frame):
     def canvas_mouse_down(self, event): # called on mouse_down
         cx, cy = self.canvas.canvasx(event.x), self.canvas.canvasy(event.y)
         clicked_node = self.get_node_at(cx, cy)
+
+        self.selected_comment = None
+        self.dragging_comment = False
         
+        # Check if clicked on a comment
         for cid, c in comments.items():
-            if c["x"] <= cx <= c["x"] + 150 and c["y"] <= cy <= c["y"] + 50:
+            if c["x"] <= cx <= c.get("x", 0) + c.get("w", 150) and c["y"] <= cy <= c.get("y", 0) + c.get("h", 50):
                 self.selected_comment = cid
                 self.dragging_comment = True
                 self.comment_offset = (cx - c["x"], cy - c["y"])
+                self.selected_node = None        # deselect any node
+                self.multi_selected_nodes.clear()  # clear multi-selection
                 self.load_comment_into_inspector()
+                self.redraw()
                 return
-
 
         if getattr(self, "mode", None) == "disconnect" and hasattr(self, "disconnect_source"):
             if clicked_node is not None and clicked_node != self.disconnect_source:
@@ -1780,10 +1901,12 @@ class VisualEditor(tk.Frame):
             self.redraw()
         else:
             self.selected_node = None
+            self.selected_comment = None
             self.multi_selected_nodes.clear()
             self.dragging_multi = False
             self.clear_inspector(True)
             self.redraw()
+
 
     def add_comment(self, text="New comment", x=None, y=None): # add a comment
         global comments
@@ -1826,10 +1949,11 @@ class VisualEditor(tk.Frame):
 
         # comment drag first
         if getattr(self, "dragging_comment", False) and self.selected_comment is not None:
-            ox, oy = self.comment_offset
-            comments[self.selected_comment]["x"] = cx - ox
-            comments[self.selected_comment]["y"] = cy - oy
-            self.redraw()
+            if getattr(self, "resizing_comment", None) is None:  # only drag if NOT resizing
+                ox, oy = self.comment_offset
+                comments[self.selected_comment]["x"] = cx - ox
+                comments[self.selected_comment]["y"] = cy - oy
+                self.redraw()
             return
 
         if not getattr(self, "dragging", False) or (self.selected_node is None and not self.dragging_multi):
@@ -1849,23 +1973,6 @@ class VisualEditor(tk.Frame):
     def canvas_mouse_up(self, event): # called on mouse_up
         self.dragging_comment = False
         self.dragging = False
-
-    def canvas_double_click(self, event): # called on double-click
-        cx = self.canvas.canvasx(event.x); cy = self.canvas.canvasy(event.y)
-        clicked = self.canvas.find_overlapping(cx,cy,cx,cy)
-        clicked_node = None
-        for item in clicked:
-            tags = self.canvas.gettags(item)
-            for t in tags:
-                if t.isdigit():
-                    clicked_node = int(t)
-                    break
-            if clicked_node:
-                break
-        if clicked_node:
-            self.selected_node = clicked_node
-            self.load_selected_into_inspector()
-            self.header_text.focus_set()
 
     def load_selected_into_inspector(self): # load selected node into inspector
         if self.selected_node is None:
