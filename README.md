@@ -46,6 +46,8 @@ Make sure you have **Python 3.8+** and **Tkinter** installed. Then run:
 python Branch.py
 ```
 
+Or you can create a new "Text Document" and rename the file (if not already enable 'show extensions' in file explorer) to 'Branch.py' removing the extension and then you can paste the latest script inside, by opening a code editor or opening with any notepad such as (Windows') Notepad, any notepad works.
+
 ---
 
 ## 🚀 Usage
