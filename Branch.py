@@ -586,13 +586,6 @@ class VisualEditor(tk.Frame):
         self.vars_list = tk.Text(vars_body, height=5, wrap="word", bg=self.theme['inspector_textbox_bg'])
         self.vars_list.pack(fill="x", expand=True, padx=4, pady=2)
 
-        # Comment Inspector
-        comment_sec, comment_body = self.make_collapsible_section(self.inspector, "Comment Text")
-        comment_sec.pack(fill=tk.X, pady=(4,0))
-
-        self.comment_textbox = tk.Text(comment_body, height=3, wrap="word", bg=self.theme['inspector_textbox_bg'])
-        self.comment_textbox.pack(fill="x", expand=True, padx=4, pady=2)
-
         def sync_text_width(event):
             text_widget = event.widget
             # get current width of the frame in pixels
@@ -605,7 +598,6 @@ class VisualEditor(tk.Frame):
         self.header_text.bind("<Configure>", sync_text_width)
         self.options_text.bind("<Configure>", sync_text_width)
         self.vars_list.bind("<Configure>", sync_text_width)
-        self.comment_textbox.bind("<Configure>", sync_text_width)
 
         # ***************************Color Section***************************        
         color_sec, color_body = self.make_collapsible_section(self.inspector, "Colors")
@@ -1646,12 +1638,12 @@ class VisualEditor(tk.Frame):
     def load_comment_into_inspector(self): # loads comment info into inspector
         if self.selected_comment is None: return
         c = comments[self.selected_comment]
-        self.comment_text_widget.delete("1.0", tk.END)
-        self.comment_text_widget.insert(tk.END, c["text"])
+        self.header_text.delete("1.0", tk.END)
+        self.header_text.insert(tk.END, c["text"])
 
     def apply_comment_edits(self): # apply comment edits to the comment
         if self.selected_comment is None: return
-        comments[self.selected_comment]["text"] = self.comment_text_widget.get("1.0", tk.END).strip()
+        comments[self.selected_comment]["text"] = self.header_text.get("1.0", tk.END).strip()
         self.redraw()
 
     def get_node_at(self, x, y): # gets node at (usually at mouse)
