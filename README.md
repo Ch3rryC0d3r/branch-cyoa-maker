@@ -89,6 +89,9 @@ goto:5                     # force jump to node 5
 
 ---
 
+## Here's how it looks up-and-running:
+![Editor Screenshot](Interface.png)
+
 ## 📜 License
 This project is licensed under the [MIT License](https://opensource.org/license/mit).
 
