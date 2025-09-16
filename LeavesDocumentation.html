@@ -1,134 +1,126 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Branch - Leaves Documentation</title>
-  <style>
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: #fdfdfd;
-      color: #333;
-      line-height: 1.6;
-      margin: 0;
-      padding: 0;
-    }
-    header {
-      background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
-      color: white;
-      padding: 2rem;
-      text-align: center;
-    }
-    header h1 {
-      margin: 0;
-      font-size: 2.5rem;
-    }
-    main {
-      max-width: 900px;
-      margin: 2rem auto;
-      padding: 1rem 2rem;
-      background: #fff;
-      border-radius: 10px;
-      box-shadow: 0 5px 20px rgba(0,0,0,0.08);
-    }
-    h2 {
-      border-bottom: 3px solid #2575fc;
-      padding-bottom: 0.5rem;
-      margin-top: 2rem;
-      color: #222;
-    }
-    p {
-      margin: 1rem 0;
-    }
-    code, pre {
-      background: #f4f4f4;
-      padding: 0.2rem 0.4rem;
-      border-radius: 5px;
-      font-family: Consolas, monospace;
-    }
-    pre {
-      display: block;
-      padding: 1rem;
-      overflow-x: auto;
-      white-space: pre-wrap;
-      word-wrap: break-word;
-    }
-    ul {
-      margin: 1rem 0 1rem 1.5rem;
-    }
-    .example {
-      background: #f0f8ff;
-      border-left: 5px solid #2575fc;
-      padding: 1rem;
-      margin: 1rem 0;
-      border-radius: 6px;
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Branch - Leaves Documentation</title>
+<style>
+  body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #fdfdfd; color: #333; line-height: 1.6; margin: 0; padding: 0; }
+  header { background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%); color: white; padding: 2rem; text-align: center; }
+  header h1 { margin: 0; font-size: 2.5rem; }
+  main { max-width: 1000px; margin: 2rem auto; padding: 1rem 2rem; background: #fff; border-radius: 10px; box-shadow: 0 5px 20px rgba(0,0,0,0.08); }
+  h2 { border-bottom: 3px solid #2575fc; padding-bottom: 0.5rem; margin-top: 2rem; color: #222; }
+  h3 { margin-top: 1.5rem; color: #444; }
+  p { margin: 1rem 0; }
+  code, pre { background: #f4f4f4; padding: 0.2rem 0.4rem; border-radius: 5px; font-family: Consolas, monospace; }
+  pre { display: block; padding: 1rem; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word; }
+  ul { margin: 1rem 0 1rem 1.5rem; }
+  .example { background: #f0f8ff; border-left: 5px solid #2575fc; padding: 1rem; margin: 1rem 0; border-radius: 6px; }
+</style>
 </head>
 <body>
-  <header>
-    <h1>🌱 Branch - Leaves Documentation</h1>
-    <p>Learn how to write and use Leaves in your Branch projects.</p>
-  </header>
-  <main>
-    <h2>What is a Leaf?</h2>
-    <p>A <strong>Leaf</strong> is a single option line inside a Node. Think of it as a branch of choices the player can pick. Each Leaf can show text, point to another Node, check conditions, and perform actions.</p>
+<header>
+  <h1>🌿 Branch - Leaves Documentation</h1>
+  <p>Learn everything about Leaves in Branch projects, from basics to advanced tricks.</p>
+</header>
+<main>
 
-    <h2>Leaf Structure</h2>
-    <p>A Leaf is written in this format:</p>
-    <pre><code>Text | Next | Condition | Actions</code></pre>
+<h2>What is a Leaf?</h2>
+<p>A <strong>Leaf</strong> is a single option line inside a Node. It's what players can pick. Each Leaf can:</p>
+<ul>
+  <li>Show <strong>Text</strong> for the choice.</li>
+  <li>Point to another Node (<strong>Next</strong>).</li>
+  <li>Check <strong>Conditions</strong> for display.</li>
+  <li>Execute <strong>Actions</strong> when chosen.</li>
+</ul>
 
-    <ul>
-      <li><strong>Text</strong> → What the player sees as the choice.</li>
-      <li><strong>Next</strong> → Which Node to go to after choosing (number or variable).</li>
-      <li><strong>Condition</strong> → Optional check before showing this option.</li>
-      <li><strong>Actions</strong> → Things that happen if chosen (like changing variables or items).</li>
-    </ul>
+<h2>Leaf Structure</h2>
+<p>Leaves are written as:</p>
+<pre><code>Text | Next | Condition | Actions</code></pre>
 
-    <div class="example">
-      <p><strong>Example:</strong></p>
-      <pre><code>Take the sword | 5 | has_item:Key | add_item:Sword</code></pre>
-      <p>This shows the choice “Take the sword”. It goes to Node 5, only appears if the player has a Key, and adds a Sword to their inventory.</p>
-    </div>
+<ul>
+  <li><strong>Text</strong> → What player sees (supports <code>{var}</code> substitution).</li>
+  <li><strong>Next</strong> → Node to go to (single, random, or variable).</li>
+  <li><strong>Condition</strong> → Optional checks for visibility.</li>
+  <li><strong>Actions</strong> → Things that happen when chosen.</li>
+</ul>
 
-    <h2>Conditions</h2>
-    <p>Conditions decide <em>whether</em> the player sees the option. If the condition is not met, the Leaf is hidden.</p>
-    <ul>
-      <li><code>has_item:Sword</code> → Only show if the player has Sword.</li>
-      <li><code>not_has_item:Key</code> → Only show if the player <em>doesn’t</em> have Key.</li>
-      <li><code>CLICKS==1</code> → Show if variable CLICKS equals 1.</li>
-    </ul>
+<div class="example">
+  <p><strong>Simple Example:</strong></p>
+  <pre><code>Take the sword | 5 | has_item:Key | add_item:Sword</code></pre>
+</div>
 
-    <div class="example">
-      <pre><code>Open the gate | 10 | has_item:Key &amp; var:CLICKS==1 | remove_item:Key</code></pre>
-      <p>This option is only visible if the player has a Key <em>and</em> CLICKS is 1. It takes the Key and moves to Node 10.</p>
-    </div>
+<h2>Conditions</h2>
+<p>Conditions control visibility. Chain them with <code>&</code> or <code>;</code>.</p>
+<ul>
+  <li><code>has_item:Sword</code> → Requires item.</li>
+  <li><code>not_has_item:Key</code> → Requires absence of item.</li>
+  <li><code>HP &lt;= 0</code> → Numeric/boolean checks.</li>
+  <li><code>var:CLICKS==1</code> → Explicit variable check.</li>
+</ul>
 
-    <h2>Actions</h2>
-    <p>When the player picks a Leaf, actions run instantly. They can:</p>
-    <ul>
-      <li><code>set:Name=Value</code> → Sets a variable (e.g. <code>set:CLICKS=1</code>).</li>
-      <li><code>CLICKS+=1</code> → Adds to a variable.</li>
-      <li><code>add_item:Sword</code> → Gives an item.</li>
-      <li><code>remove_item:Key</code> → Takes away an item.</li>
-      <li><code>rand_set:Weather:Rain,Sun</code> → Randomly sets Weather to Rain or Sun.</li>
-      <li><code>goto:5</code> → Jump straight to Node 5.</li>
-    </ul>
+<h2>Actions</h2>
+<p>Actions execute when a Leaf is chosen. Chain with <code>&</code> or <code>;</code>.</p>
 
-    <div class="example">
-      <pre><code>Attack the guard | 12 | | CLICKS+=1 &amp; add_item:Sword</code></pre>
-      <p>Choosing this adds 1 to CLICKS, gives the Sword, and jumps to Node 12.</p>
-    </div>
+<h3>Variables</h3>
+<ul>
+  <li><code>gold = 100</code> → Assign value.</li>
+  <li><code>gold += 5</code> → Modify (also <code>-=</code>, <code>*=</code>, <code>/=</code>).</li>
+</ul>
 
-    <h2>Tips</h2>
-    <ul>
-      <li>You can chain multiple actions with <code>;</code> or <code>&amp;</code>.</li>
-      <li>If there’s no Condition, the option always shows.</li>
-      <li>If there’s no Next, the story stays in the same Node.</li>
-    </ul>
+<h3>Inventory</h3>
+<ul>
+  <li><code>add_item:Sword</code> → Add item.</li>
+  <li><code>remove_item:Key</code> → Remove item.</li>
+  <li><code>clearinv</code> → Wipe entire inventory.</li>
+</ul>
 
-    <h2>Summary</h2>
-    <p>Leaves are the “choices” in your Branch story. Each one has Text, a Next step, optional Conditions, and Actions. By combining them, you can create deep, interactive paths for your players.</p>
-  </main>
+<h3>Flow Control</h3>
+<ul>
+  <li><code>goto:10</code> → Jump to node.</li>
+  <li><code>once:add_item:Map</code> → Run action only the first time (never again).</li>
+</ul>
+
+<h3>Randomization</h3>
+<ul>
+  <li><code>randr(damage:5,20)</code> → Random float in range.</li>
+  <li><code>rands(weather:Sunny,Cloudy)</code> → Random from list.</li>
+  <li><code>weighted(weather, Sunny=70, Rain=30)</code> → Weighted random choice.</li>
+  <li><code>change(30)&gt;gold+=10&gt;gold-=5</code> → 30% chance → success action, else → fail action.</li>
+</ul>
+
+<h3>Loops</h3>
+<ul>
+  <li><code>repeat:3&gt;gold+=1</code> → Repeat action N times.</li>
+</ul>
+
+<h3>Sound (requires <code>pygame</code>)</h3>
+<ul>
+  <li><code>play:coin.wav</code> → Play once, non-blocking.</li>
+  <li><code>loop_sound:bgm.mp3</code> → Loop until stopped.</li>
+  <li><code>stop_sound:bgm.mp3</code> → Stop specific sound.</li>
+</ul>
+
+<h3>Instant Actions (@)</h3>
+<p>Run on node entry, before choice.</p>
+<pre><code>@HP-=5
+@add_item:Key</code></pre>
+
+<h3>Conditional Actions</h3>
+<pre><code>if(HP&lt;=0)&gt;goto:GameOver
+if(has_item:Sword)&gt;gold+=50</code></pre>
+
+<div class="example">
+  <p><strong>Complex Example:</strong></p>
+  <pre><code>Fight the dragon | 20 | var:LEVEL&gt;=5 &amp; has_item:Sword | 
+@HP-=20; randr(Damage:5,15); weighted(Loot, Gold=70, Gem=20, Nothing=10); 
+once:add_item:Trophy; play:roar.wav; change(30)&gt;goto:Victory&gt;goto:Defeat</code></pre>
+</div>
+
+<h2>Summary</h2>
+<p>Leaves are the heart of Branch stories. Use text, conditions, actions, instant triggers, sound, randomization, and flow control to craft dynamic CYOA adventures.</p>
+
+</main>
 </body>
+<p>Last update: Branch v0.5.02.10</p>
 </html>
