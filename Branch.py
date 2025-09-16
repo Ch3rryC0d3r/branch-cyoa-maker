@@ -1,6 +1,6 @@
 """ 
 Branch, a CYOA (Choose-Your-Own-Adventure) Maker.
-Version: v0.5.02.09
+Version: v0.5.02.10
 
 ******************************************To Do******************************************
 @1@ Fix zooming. Calling 'redraw()' never drawed the nodes with sizes based on the 'current_zoom', 
@@ -17,6 +17,7 @@ Version: v0.5.02.09
 ********************************************************************************************
 
 Changelog:
+v0.5.02.10 - Added sound commands for leaves (play:SOUND[.ext]) Example: play:page_turn.mp3 | the directory for sounds is at ./sounds/ || Added once:ACTION, chance:CHANCE>ACTION>ELSE, repeat:TIMES, weighted(VAR, item=weight, ...).
 v0.5.02.09 - Changed 'bubblegum' theme preset.
 v0.5.02.08 - Play mode render bugfix.
 v0.5.02.07 - Added Instant Action(s) to leaves ("@-action") and if support, like "if(CONDITION)>ACTION", and changed rand_set to rands and added randr (random range).
@@ -27,7 +28,7 @@ v0.5.02.03 - fixed 'search_node' you can now use Ctrl+F type a number then press
 """
 
 # built-ins
-import os, re, ast, math, json, copy, random, operator, threading
+import os, re, ast, math, json, copy, random, operator
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 # tkinter
@@ -37,8 +38,9 @@ import tkinter.font as tkFont
 import tkinter.ttk as ttk
 
 # playsound
-from playsound import playsound
-
+import pygame
+pygame.mixer.init()
+_sound_cache = {}
 
 _ALLOWED_MATH_FUNCS = { # allowed (math) functions
     'sin': math.sin, 'cos': math.cos, 'tan': math.tan, 'sqrt': math.sqrt,
@@ -228,15 +230,16 @@ def execute_actions(actions: List[str]):
 
                 # ------------------ play:SOUND ------------------
                 if sub.startswith("play:"):
-                    sound_name = sub.split(":", 1).strip()
+                    sound_name = sub.split(":", 1)[1].strip()
                     if sound_name:
                         path = os.path.join("./sounds", sound_name)
-                        def _play():
-                            try:
-                                playsound(path)
-                            except Exception as e:
-                                print(f"[WARN] could not play sound {path}: {e}")
-                        threading.Thread(target=_play, daemon=True).start()
+                        try:
+                            # cache sounds so repeated plays are instant
+                            if path not in _sound_cache:
+                                _sound_cache[path] = pygame.mixer.Sound(path)
+                            _sound_cache[path].play()
+                        except Exception as e:
+                            print(f"[WARN] could not play sound {path}: {e}")
                     continue
 
                 # ------------------ once:ACT ------------------
