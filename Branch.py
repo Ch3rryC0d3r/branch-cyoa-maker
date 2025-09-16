@@ -1,6 +1,6 @@
 """ 
 Branch, a CYOA (Choose-Your-Own-Adventure) Maker.
-Version: v0.5.02.07
+Version: v0.5.02.08
 
 ******************************************To Do******************************************
 @1@ Fix zooming. Calling 'redraw()' never drawed the nodes with sizes based on the 'current_zoom', 
@@ -17,6 +17,7 @@ Version: v0.5.02.07
 ********************************************************************************************
 
 Changelog:
+v0.5.02.08 - Play mode render bugfix.
 v0.5.02.07 - Added Instant Action(s) to leaves ("@-action") and if support, like "if(CONDITION)>ACTION", and changed rand_set to rands and added randr (random range).
 v0.5.02.06 - Fixed node coloration settings. ('change_node_colors' + 'udtdnc') ["udtdnc" stands  for use default themes' default node color, [always]. (when creating a new node)]
 v0.5.02.05 - Fixed deletion bugs
@@ -129,7 +130,13 @@ MIN_W, MIN_H = 30, 20 # minimum size for comments
 
 # A "LEAF" (it doesn't matter if it's uppercased) is simply a name for an option line in the Node Inspector.
 
-def parse_option_line(line: str) -> Optional[Dict]:
+def parse_option_line(line: Union[str, Dict]) -> Optional[Dict]:
+    if isinstance(line, dict):
+        return line  # already parsed, just return it
+
+    if not isinstance(line, str):
+        return None  # invalid input
+
     raw = line.strip()
     if not raw:
         return None
@@ -147,7 +154,12 @@ def parse_option_line(line: str) -> Optional[Dict]:
     nxt = nxt if nxt else None
     return {"text": text, "next": nxt, "condition": cond, "actions": actions, "instant": False}
 
-def format_option_line(opt: Dict) -> str: # fix format in option line(s)
+def format_option_line(opt: Dict) -> str:
+    if opt.get("instant"):
+        # For instant leaves, prepend '@' to the first action
+        acts = ";".join(opt.get("actions", []))
+        return f"@{acts}" if acts else "@"
+    
     acts = ";".join(opt.get("actions", [])) if opt.get("actions") else ""
     cond = opt.get("condition") or ""
     nxt = "" if opt.get("next") is None else str(opt.get("next"))
@@ -189,7 +201,10 @@ def execute_actions(actions: List[str]):
     for act in actions:
         if not act:
             continue
+
+        # split multiple actions by & or ;
         subs = [s.strip() for s in re.split(r'[&;]', act) if s.strip()]
+
         for sub in subs:
             try:
                 # ------------------ instant @ action ------------------
@@ -198,7 +213,63 @@ def execute_actions(actions: List[str]):
                     execute_actions([instant_act])
                     continue
 
-                # ------------------ randr(variable: min, max) ------------------
+                # ------------------ if(COND)>ACT ------------------
+                m_if = re.match(r"^if\((.+)\)>(.+)$", sub)
+                if m_if:
+                    cond_expr, act_expr = m_if.group(1).strip(), m_if.group(2).strip()
+                    if evaluate_condition(cond_expr):
+                        execute_actions([act_expr])
+                    continue
+
+                # ------------------ assignment without var: (X=5, Y+=2, etc) ------------------
+                m_var = re.match(r"^([A-Za-z_][A-Za-z0-9_]*)\s*([\+\-\*/]?=)\s*(.+)$", sub)
+                if m_var:
+                    name, op, rhs = m_var.group(1), m_var.group(2), m_var.group(3)
+                    try:
+                        rhs_val = safe_eval_expr(rhs, vars_store)
+                    except Exception:
+                        rhs_val = rhs.strip('"').strip("'")
+                        try: rhs_val = int(rhs_val)
+                        except:
+                            try: rhs_val = float(rhs_val)
+                            except: pass
+                    cur = vars_store.get(name, 0)
+                    if op == "=":
+                        vars_store[name] = rhs_val
+                    elif op == "+=":
+                        try: vars_store[name] = (cur or 0) + rhs_val
+                        except: vars_store[name] = rhs_val
+                    elif op == "-=":
+                        try: vars_store[name] = (cur or 0) - rhs_val
+                        except: vars_store[name] = cur
+                    elif op == "*=":
+                        try: vars_store[name] = (cur or 0) * rhs_val
+                        except: vars_store[name] = cur
+                    elif op == "/=":
+                        try: vars_store[name] = (cur or 0) / rhs_val
+                        except: vars_store[name] = cur
+                    continue
+
+                # ------------------ the rest of the actions ------------------
+                # add_item/remove_item
+                if sub.startswith("add_item:"):
+                    name = sub.split(":",1)[1].strip()
+                    if name and name not in inventory:
+                        inventory.append(name)
+                    continue
+
+                if sub.startswith("remove_item:"):
+                    name = sub.split(":",1)[1].strip()
+                    if name in inventory:
+                        inventory.remove(name)
+                    continue
+
+                # goto:target
+                if sub.startswith("goto:"):
+                    vars_store["__goto"] = sub.split(":",1)[1].strip()
+                    continue
+
+                # randr(variable: min, max)
                 if sub.startswith("randr(") and sub.endswith(")"):
                     payload = sub[6:-1].strip()
                     if ":" in payload and "," in payload:
@@ -211,7 +282,7 @@ def execute_actions(actions: List[str]):
                             continue
                     continue
 
-                # ------------------ rands(variable: item1, item2, ...) ------------------
+                # rands(variable: item1, item2, ...)
                 if sub.startswith("rands(") and sub.endswith(")"):
                     payload = sub[6:-1].strip()
                     if ":" in payload:
@@ -222,15 +293,7 @@ def execute_actions(actions: List[str]):
                             vars_store[varname] = random.choice(choices)
                     continue
 
-                # ------------------ if(COND)>ACT ------------------
-                m_if = re.match(r"^if\((.+)\)>(.+)$", sub)
-                if m_if:
-                    cond_expr, act_expr = m_if.group(1).strip(), m_if.group(2).strip()
-                    if evaluate_condition(cond_expr):
-                        execute_actions([act_expr])
-                    continue
-
-                # ------------------ set:variable=value ------------------
+                # set:variable=value (legacy)
                 if sub.startswith("set:"):
                     payload = sub.split(":", 1)[1]
                     if "=" not in payload:
@@ -245,76 +308,14 @@ def execute_actions(actions: List[str]):
                         elif raw.lower() == "false":
                             val = False
                         else:
-                            try:
-                                val = int(raw)
-                            except Exception:
-                                try:
-                                    val = float(raw)
-                                except Exception:
-                                    val = raw.strip('"').strip("'")
+                            try: val = int(raw)
+                            except:
+                                try: val = float(raw)
+                                except: val = raw.strip('"').strip("'")
                     vars_store[name] = val
                     continue
 
-                # ------------------ add_item/remove_item ------------------
-                if sub.startswith("add_item:"):
-                    name = sub.split(":",1)[1].strip()
-                    if name and name not in inventory:
-                        inventory.append(name)
-                    continue
-
-                if sub.startswith("remove_item:"):
-                    name = sub.split(":",1)[1].strip()
-                    if name in inventory:
-                        inventory.remove(name)
-                    continue
-
-                # ------------------ goto:target ------------------
-                if sub.startswith("goto:"):
-                    vars_store["__goto"] = sub.split(":",1)[1].strip()
-                    continue
-
-                # ------------------ var: assignments (var:X+=Y / var:X=Y) ------------------
-                if sub.startswith("var:"):
-                    payload = sub.split(":",1)[1].strip()
-                    m = re.match(r"^([A-Za-z_][A-Za-z0-9_]*)\s*([\+\-\*/]?=)\s*(.+)$", payload)
-                    if m:
-                        name, op, rhs = m.group(1), m.group(2), m.group(3)
-                        try:
-                            rhs_val = safe_eval_expr(rhs, vars_store)
-                        except Exception:
-                            try:
-                                rhs_val = int(rhs)
-                            except Exception:
-                                try:
-                                    rhs_val = float(rhs)
-                                except Exception:
-                                    rhs_val = rhs.strip('"').strip("'")
-                        cur = vars_store.get(name, 0)
-                        if op == "=":
-                            vars_store[name] = rhs_val
-                        elif op == "+=":
-                            try: vars_store[name] = (cur or 0) + rhs_val
-                            except: vars_store[name] = rhs_val
-                        elif op == "-=":
-                            try: vars_store[name] = (cur or 0) - rhs_val
-                            except: vars_store[name] = cur
-                        elif op == "*=":
-                            try: vars_store[name] = (cur or 0) * rhs_val
-                            except: vars_store[name] = cur
-                        elif op == "/=":
-                            try: vars_store[name] = (cur or 0) / rhs_val
-                            except: vars_store[name] = cur
-                    else:
-                        if "=" in payload:
-                            name, rhs = payload.split("=",1)
-                            name, rhs = name.strip(), rhs.strip()
-                            try: vars_store[name] = safe_eval_expr(rhs, vars_store)
-                            except Exception: vars_store[name] = rhs
-                        else:
-                            vars_store[payload] = vars_store.get(payload, 0)
-                    continue
-
-                # ------------------ fallback: generic name=val ------------------
+                # fallback: generic name=val
                 if "=" in sub:
                     name, val_expr = sub.split("=",1)
                     name, val_expr = name.strip(), val_expr.strip()
@@ -390,26 +391,33 @@ def find_dead_ends() -> List[Tuple[int, Dict]]: # finds dead ends in nodes
     return bad
 
 def run_instant_leaves(node_id: int) -> int:
+    current = node_id
     while True:
-        node = nodes.get(node_id)
+        node = nodes.get(current)
         if not node:
-            return node_id
-
+            return current
+        changed = False
         for opt_raw in node.get("options", []):
-            opt = parse_option_line(opt_raw)
+            # parse if it's a string
+            if isinstance(opt_raw, str):
+                opt = parse_option_line(opt_raw)
+            elif isinstance(opt_raw, dict):
+                opt = opt_raw
+            else:
+                continue
+
             if opt and opt.get("instant"):
                 execute_actions(opt.get("actions", []))
-
-        # handle __goto jumps set by instant leaves
-        if vars_store.get("__goto"):
-            maybe = vars_store.pop("__goto")
-            nxt_try = resolve_next(maybe)
-            if nxt_try is not None:
-                node_id = nxt_try
-                continue  # loop again to run instant leaves in the new node
-        break
-
-    return node_id
+                # handle cascading goto
+                if "__goto" in vars_store:
+                    nxt = resolve_next(vars_store.pop("__goto"))
+                    if nxt is not None and nxt != current:
+                        current = nxt
+                        changed = True
+                        break  # restart processing instant leaves in new node
+        if not changed:
+            break
+    return current
 
 NODE_W = 180 # node width
 NODE_H = 80 # node height
@@ -2451,7 +2459,7 @@ class VisualEditor(tk.Frame):
         return re.sub(r"\{(\w+)\}", repl, text)
     
     def play_render_current(self):
-        # --- Run instant leaves & handle cascading gotos ---
+        # Run instant leaves (cascading gotos included)
         self.play_current = run_instant_leaves(self.play_current)
 
         if self.play_current not in nodes:
@@ -2469,14 +2477,13 @@ class VisualEditor(tk.Frame):
         self.play_path.append(self.play_current)
 
         # substitute variables in header
-        header_text = self.substitute_vars(node.get("header", ""))
-        self.play_header.config(text=header_text)
+        self.play_header.config(text=self.substitute_vars(node.get("header", "")))
 
-        # --- Gather visible normal leaves ---
+        # Gather visible normal leaves
         visible = []
         for opt_raw in node.get("options", []):
             opt = parse_option_line(opt_raw)
-            if not opt or opt.get("instant"):  # skip instant leaves
+            if not opt or opt.get("instant"):
                 continue
             if evaluate_condition(opt.get("condition")):
                 visible.append(opt)
@@ -2489,13 +2496,13 @@ class VisualEditor(tk.Frame):
             if self.settings.get('show_path', True):
                 tk.Label(
                     self.choice_frame,
-                    text="Path: " + " -> ".join(map(str, self.play_path))
+                    text="Path: " + " -> ".join(map(str,self.play_path))
                 ).pack()
             tk.Button(self.choice_frame, text="Play Again", command=self.play_restart).pack(pady=(6, 0))
             tk.Button(self.choice_frame, text="Close Play", command=self.close_play).pack(pady=(6, 0))
             return
 
-        for i, opt in enumerate(visible, start=1):
+        for opt in visible:
             opt_text = self.substitute_vars(opt.get("text", "choice"))
             btn = tk.Button(
                 self.choice_frame,
@@ -2517,6 +2524,7 @@ class VisualEditor(tk.Frame):
             tk.Button(self.choice_frame, text="Close Play", command=self.close_play).pack(pady=(6,0))
             return
 
+        # run instant leaves in the next node (cascading)
         self.play_current = run_instant_leaves(nxt)
         self.play_render_current()
 
