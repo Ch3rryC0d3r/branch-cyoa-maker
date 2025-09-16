@@ -1,6 +1,6 @@
 """ 
 Branch, a CYOA (Choose-Your-Own-Adventure) Maker.
-Version: v0.5.02.08
+Version: v0.5.02.09
 
 ******************************************To Do******************************************
 @1@ Fix zooming. Calling 'redraw()' never drawed the nodes with sizes based on the 'current_zoom', 
@@ -17,6 +17,7 @@ Version: v0.5.02.08
 ********************************************************************************************
 
 Changelog:
+v0.5.02.09 - Changed 'bubblegum' theme preset.
 v0.5.02.08 - Play mode render bugfix.
 v0.5.02.07 - Added Instant Action(s) to leaves ("@-action") and if support, like "if(CONDITION)>ACTION", and changed rand_set to rands and added randr (random range).
 v0.5.02.06 - Fixed node coloration settings. ('change_node_colors' + 'udtdnc') ["udtdnc" stands  for use default themes' default node color, [always]. (when creating a new node)]
