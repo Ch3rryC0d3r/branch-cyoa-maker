@@ -1,6 +1,6 @@
 """ 
 Branch, a CYOA (Choose-Your-Own-Adventure) Maker.
-Version: v0.5.02.10
+Version: v0.5.02.11
 
 ******************************************To Do******************************************
 @1@ Fix zooming. Calling 'redraw()' never drawed the nodes with sizes based on the 'current_zoom', 
@@ -17,6 +17,7 @@ Version: v0.5.02.10
 ********************************************************************************************
 
 Changelog:
+v0.5.02.11 - remove sound support due to bug, will add back later.
 v0.5.02.10 - Added sound commands for leaves (play:SOUND[.ext]) Example: play:page_turn.mp3 | the directory for sounds is at ./sounds/ || Added once:ACTION, chance:CHANCE>ACTION>ELSE, repeat:TIMES, weighted(VAR, item=weight, ...).
 v0.5.02.09 - Changed 'bubblegum' theme preset.
 v0.5.02.08 - Play mode render bugfix.
@@ -38,9 +39,9 @@ import tkinter.font as tkFont
 import tkinter.ttk as ttk
 
 # playsound
-import pygame
-pygame.mixer.init()
-_sound_cache = {}
+#import pygame
+#pygame.mixer.init()
+#_sound_cache = {}
 
 _ALLOWED_MATH_FUNCS = { # allowed (math) functions
     'sin': math.sin, 'cos': math.cos, 'tan': math.tan, 'sqrt': math.sqrt,
@@ -226,20 +227,6 @@ def execute_actions(actions: List[str]):
                     cond_expr, act_expr = m_if.group(1).strip(), m_if.group(2).strip()
                     if evaluate_condition(cond_expr):
                         execute_actions([act_expr])
-                    continue
-
-                # ------------------ play:SOUND ------------------
-                if sub.startswith("play:"):
-                    sound_name = sub.split(":", 1)[1].strip()
-                    if sound_name:
-                        path = os.path.join("./sounds", sound_name)
-                        try:
-                            # cache sounds so repeated plays are instant
-                            if path not in _sound_cache:
-                                _sound_cache[path] = pygame.mixer.Sound(path)
-                            _sound_cache[path].play()
-                        except Exception as e:
-                            print(f"[WARN] could not play sound {path}: {e}")
                     continue
 
                 # ------------------ once:ACT ------------------
@@ -2476,83 +2463,6 @@ class VisualEditor(tk.Frame):
             return str(vars_store.get(key, f"{{{key}}}"))
         return re.sub(r"\{(\w+)\}", repl, text)
  
-
-    def toggle_mode(self): # toggle mode (play>editor, editor>play)
-        if self.mode == "editor":
-            self.enter_play_mode()
-        else:
-            self.enter_editor_mode()
-
-    def enter_play_mode(self): # enter play mode
-        self.mode = "play"
-        self.mode_button.config(text="Switch to Editor Mode")
-        self.reset_state()
-        self.play_window = tk.Toplevel(self.master)
-        self.play_window.title("Play Mode")
-        self.play_window.geometry("480x360")
-
-        self.play_window.protocol("WM_DELETE_WINDOW", self.close_play)       
-
-        tk.Label(self.play_window, text=f"Play Mode").pack()
-        self.play_area = tk.Frame(self.play_window)
-        self.play_area.pack(fill=tk.BOTH, expand=True)
-        self.play_header = tk.Label(self.play_area, text="", wraplength=440, justify="left", font=("TkDefaultFont", 11))
-        self.play_header.pack(pady=(10,5))
-        self.choice_frame = tk.Frame(self.play_area)
-        self.choice_frame.pack(pady=(6,10))
-        ctrl = tk.Frame(self.play_window)
-        ctrl.pack(fill=tk.X)
-        tk.Button(ctrl, text="Restart", command=self.play_restart).pack(side=tk.LEFT)
-        #tk.Button(ctrl, text="Reset vars/inv", command=self.reset_state).pack(side=tk.LEFT)
-        #tk.Button(ctrl, text="Close Play", command=self.close_play).pack(side=tk.RIGHT)
-        self.play_current = START_NODE
-        self.play_path = []
-        self.play_render_current()
-
-    def enter_editor_mode(self): # enter editor mode
-        self.mode = "editor"
-        self.mode_button.config(text="Switch to Play Mode")
-        try:
-            self.play_window.destroy()
-        except Exception:
-            pass
-
-    def close_play(self): # close play
-        self.enter_editor_mode()
-
-    def reset_state(self): # reset state (variables and inventory for play mode)
-        vars_store.clear()
-        inventory.clear()
-        defaults = self.vars_list.get("1.0", tk.END).strip().splitlines()
-        for line in defaults:
-            line = line.strip()
-            if not line:
-                continue
-            if line.startswith("inv:"):
-                item = line.split(":", 1)[1].strip()
-                if item:
-                    inventory.append(item)
-            elif "=" in line:
-                name, val = line.split("=", 1)
-                name, val = name.strip(), val.strip()
-                try:
-                    vars_store[name] = safe_eval_expr(val, vars_store)
-                except Exception:
-                    vars_store[name] = val
-
-    def play_restart(self): # restart the play [mode] session
-        self.reset_state()
-        self.play_current = START_NODE; self.play_path = []; self.play_render_current()
-
-    @staticmethod
-    def substitute_vars(text: str) -> str: # substitute variables, used for inline variable support such as "Clicks: {CLICSKS}" ({CLICKS} gets replaced with the variable 'CLICKS' if it exists)
-        if not text:
-            return ""
-        def repl(match):
-            key = match.group(1)
-            return str(vars_store.get(key, f"{{{key}}}"))
-        return re.sub(r"\{(\w+)\}", repl, text)
-    
     def play_render_current(self):
         # Run instant leaves (cascading gotos included)
         self.play_current = run_instant_leaves(self.play_current)
@@ -2621,21 +2531,6 @@ class VisualEditor(tk.Frame):
 
         # run instant leaves in the next node (cascading)
         self.play_current = run_instant_leaves(nxt)
-        self.play_render_current()
-
-    def play_pick(self, opt):
-        execute_actions(opt.get("actions",[]))
-        nxt = resolve_next(opt.get("next"))
-        if nxt is None:
-            self.play_header.config(text="[THE END]")
-            for w in self.choice_frame.winfo_children():
-                w.destroy()
-            if not self.settings.get("show_path", False):
-                pass
-                #tk.Label(self.choice_frame, text="Path: " + " -> ".join(map(str,self.play_path))).pack()
-            tk.Button(self.choice_frame, text="Play Again", command=self.play_restart).pack(pady=(6,0))
-            return
-        self.play_current = nxt
         self.play_render_current()
 
     def build_example(self): # builds an example scene
