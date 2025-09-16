@@ -8,7 +8,7 @@ Version: v0.5.02.09
 
 @2@ Add a 'Change ID' in the node right-click menu. 
 
-@3@ 'truncate_text_to_fit()' doesn't acknowledge any returned lines, just words+chars. 
+@3@ 'truncate_text_to_fit()' doesn't acknowledge a                                                                                                                                                                                                                                                                                                                                                                                                                                              ny returned lines, just words+chars. 
     [make it where it does truncate based on returned lines]
 
 @4@ Add a setting field for 'default comment width' and 'default comment height' 
