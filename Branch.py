@@ -1,20 +1,31 @@
 """ 
 Branch, a CYOA (Choose-Your-Own-Adventure) Maker.
-Version: v0.5.02.05
+Version: v0.5.02.07
 
 ******************************************To Do******************************************
-@1@ Fix zooming. Calling 'redraw()' never drawed the nodes with sizes based on the 'current_zoom', I've tried before, however, the click detection was offset each time I dragged a node.
+@1@ Fix zooming. Calling 'redraw()' never drawed the nodes with sizes based on the 'current_zoom', 
+    I've tried before, however, the node offset way too far (~ 1,-1) each time I tried to dragged a node.
+
+@2@ Add a 'Change ID' in the node right-click menu. 
+
+@3@ 'truncate_text_to_fit()' doesn't acknowledge any returned lines, just words+chars. 
+    [make it where it does truncate based on returned lines]
+
+@4@ Add a setting field for 'default comment width' and 'default comment height' 
+    (added, however, I didn't add visual fields in the 'open_settings()' 
+    only the actual settings in the default settings.json{})
 ********************************************************************************************
 
 Changelog:
-v0.5.02.04 - Fixed deletion bugs
-v0.5.02.04 - "(Quick) Add Node" adds the node with the next AVAILABLE id, v0.5.02.03 and since did "max+1".
+v0.5.02.07 - Added Instant Action(s) to leaves ("@-action") and if support, like "if(CONDITION)>ACTION", and changed rand_set to rands and added randr (random range).
+v0.5.02.06 - Fixed node coloration settings. ('change_node_colors' + 'udtdnc') ["udtdnc" stands  for use default themes' default node color, [always]. (when creating a new node)]
+v0.5.02.05 - Fixed deletion bugs
+v0.5.02.04 - "(Quick) Add Node" adds the node with the next AVAILABLE id, previously (v0.5.02.03 and since) did "max node id + 1".
 v0.5.02.03 - fixed 'search_node' you can now use Ctrl+F type a number then press enter to find a node.
 """
 
 # built-ins
 import os, re, ast, math, json, copy, random, operator
-
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 # tkinter
@@ -104,35 +115,37 @@ def safe_eval_expr(expr: str, names: dict): # evaluates an expression safely
 
     return _eval(node)
 
-# constants and whatnot
-nodes: Dict[int, Dict] = {}  
+# dictionaries and whatnot
+nodes: Dict[int, Dict] = {}
 comments = {}
-vars_store: Dict[str, Any] = {}
-inventory: List[str] = []
-START_NODE = 1
-BASE_FONT_SIZE = 11
-SETTINGS_PATH = "./settings.json"
-THEME_PATH = "./theme.json"
+vars_store: Dict[str, Any] = {} # variable storage
+inventory: List[str] = [] # inventory list
+# constants
+START_NODE = 1 # default start node
+BASE_FONT_SIZE = 11 # font size
+SETTINGS_PATH = "./settings.json" # path for 'settings.json' (saves your in-app settings on exit)
+THEME_PATH = "./theme.json" # path for 'theme.json' (saves your in-app theme on exit)
 MIN_W, MIN_H = 30, 20 # minimum size for comments
 
-# A "LEAF" is simply a name for an option line in the Node Inspector.
+# A "LEAF" (it doesn't matter if it's uppercased) is simply a name for an option line in the Node Inspector.
 
-def parse_option_line(line: str) -> Optional[Dict]: # parses an option line (or a "LEAF")
+def parse_option_line(line: str) -> Optional[Dict]:
     raw = line.strip()
     if not raw:
         return None
-    parts = [p.strip() for p in raw.split("|")]
 
-    # ensure 4 parts: text | next | condition | actions
+    # instant leaf (starts with @) → no text/next/cond, only actions
+    if raw.startswith("@"):
+        return {"instant": True, "actions": [raw[1:].strip()]}
+
+    parts = [p.strip() for p in raw.split("|")]
     while len(parts) < 4:
         parts.append("")
     text, nxt, cond, acts = parts[0], parts[1], parts[2], parts[3]
-
-    # actions can be separated by & or ;
     actions = [a.strip() for a in re.split(r'[&;]', acts) if a.strip()] if acts else []
     cond = cond if cond else None
     nxt = nxt if nxt else None
-    return {"text": text, "next": nxt, "condition": cond, "actions": actions}
+    return {"text": text, "next": nxt, "condition": cond, "actions": actions, "instant": False}
 
 def format_option_line(opt: Dict) -> str: # fix format in option line(s)
     acts = ";".join(opt.get("actions", [])) if opt.get("actions") else ""
@@ -172,13 +185,52 @@ def evaluate_condition(cond: Optional[str]) -> bool: # evaluate the condition 'c
             return False
     return True
 
-def execute_actions(actions: List[str]): # execute a LEAF action such as 'CLICKS+=1' (add 1 to the variable 'CLICKS')
+def execute_actions(actions: List[str]):
     for act in actions:
         if not act:
             continue
         subs = [s.strip() for s in re.split(r'[&;]', act) if s.strip()]
         for sub in subs:
             try:
+                # ------------------ instant @ action ------------------
+                if sub.startswith("@"):
+                    instant_act = sub[1:].strip()
+                    execute_actions([instant_act])
+                    continue
+
+                # ------------------ randr(variable: min, max) ------------------
+                if sub.startswith("randr(") and sub.endswith(")"):
+                    payload = sub[6:-1].strip()
+                    if ":" in payload and "," in payload:
+                        varname, range_vals = payload.split(":", 1)
+                        varname = varname.strip()
+                        try:
+                            min_val, max_val = [float(v.strip()) for v in range_vals.split(",", 1)]
+                            vars_store[varname] = random.uniform(min_val, max_val)
+                        except Exception:
+                            continue
+                    continue
+
+                # ------------------ rands(variable: item1, item2, ...) ------------------
+                if sub.startswith("rands(") and sub.endswith(")"):
+                    payload = sub[6:-1].strip()
+                    if ":" in payload:
+                        varname, items = payload.split(":", 1)
+                        varname = varname.strip()
+                        choices = [i.strip() for i in re.split(r'[,/]', items) if i.strip()]
+                        if choices:
+                            vars_store[varname] = random.choice(choices)
+                    continue
+
+                # ------------------ if(COND)>ACT ------------------
+                m_if = re.match(r"^if\((.+)\)>(.+)$", sub)
+                if m_if:
+                    cond_expr, act_expr = m_if.group(1).strip(), m_if.group(2).strip()
+                    if evaluate_condition(cond_expr):
+                        execute_actions([act_expr])
+                    continue
+
+                # ------------------ set:variable=value ------------------
                 if sub.startswith("set:"):
                     payload = sub.split(":", 1)[1]
                     if "=" not in payload:
@@ -201,78 +253,29 @@ def execute_actions(actions: List[str]): # execute a LEAF action such as 'CLICKS
                                 except Exception:
                                     val = raw.strip('"').strip("'")
                     vars_store[name] = val
+                    continue
 
-                elif sub.startswith("add_item:"):
+                # ------------------ add_item/remove_item ------------------
+                if sub.startswith("add_item:"):
                     name = sub.split(":",1)[1].strip()
                     if name and name not in inventory:
                         inventory.append(name)
+                    continue
 
-                elif sub.startswith("remove_item:"):
+                if sub.startswith("remove_item:"):
                     name = sub.split(":",1)[1].strip()
                     if name in inventory:
                         inventory.remove(name)
-
-                elif sub.startswith("rand_set:"):
-                    payload = sub.split(":",1)[1]
-                    if ":" not in payload:
-                        continue
-                    name, opts = payload.split(":",1)
-                    choices = [o.strip() for o in opts.split(",") if o.strip()]
-                    if choices:
-                        vars_store[name.strip()] = random.choice(choices)
-
-                elif sub.startswith("goto:"):
-                    vars_store["__goto"] = sub.split(":",1)[1].strip()
-
-                m2 = re.match(r"^([A-Za-z_][A-Za-z0-9_]*)\s*([\+\-\*/%]?=)\s*(.+)$", sub)
-                if m2:
-                    name, op, rhs = m2.group(1), m2.group(2), m2.group(3)
-                    # evaluate RHS safely
-                    try:
-                        rhs_val = safe_eval_expr(rhs, vars_store)
-                    except Exception:
-                        try:
-                            rhs_val = int(rhs)
-                        except Exception:
-                            try:
-                                rhs_val = float(rhs)
-                            except Exception:
-                                rhs_val = rhs.strip('"').strip("'")
-                    cur = vars_store.get(name, 0)
-                    # apply operator
-                    if op == "=":
-                        vars_store[name] = rhs_val
-                    elif op == "+=":
-                        try:
-                            vars_store[name] = (cur or 0) + rhs_val
-                        except Exception:
-                            vars_store[name] = rhs_val
-                    elif op == "-=":
-                        try:
-                            vars_store[name] = (cur or 0) - rhs_val
-                        except Exception:
-                            vars_store[name] = cur
-                    elif op == "*=":
-                        try:
-                            vars_store[name] = (cur or 0) * rhs_val
-                        except Exception:
-                            vars_store[name] = cur
-                    elif op == "/=":
-                        try:
-                            vars_store[name] = (cur or 0) / rhs_val
-                        except Exception:
-                            vars_store[name] = cur
-                    elif op == "%=":
-                        try:
-                            vars_store[name] = (cur or 0) % rhs_val
-                        except Exception:
-                            vars_store[name] = cur
-                    # handled — skip further checks for this sub
                     continue
 
-                elif sub.startswith("var:"):
+                # ------------------ goto:target ------------------
+                if sub.startswith("goto:"):
+                    vars_store["__goto"] = sub.split(":",1)[1].strip()
+                    continue
+
+                # ------------------ var: assignments (var:X+=Y / var:X=Y) ------------------
+                if sub.startswith("var:"):
                     payload = sub.split(":",1)[1].strip()
-                    # match var:x+=expr  var:x=expr etc.
                     m = re.match(r"^([A-Za-z_][A-Za-z0-9_]*)\s*([\+\-\*/]?=)\s*(.+)$", payload)
                     if m:
                         name, op, rhs = m.group(1), m.group(2), m.group(3)
@@ -290,39 +293,36 @@ def execute_actions(actions: List[str]): # execute a LEAF action such as 'CLICKS
                         if op == "=":
                             vars_store[name] = rhs_val
                         elif op == "+=":
-                            vars_store[name] = (cur or 0) + rhs_val
+                            try: vars_store[name] = (cur or 0) + rhs_val
+                            except: vars_store[name] = rhs_val
                         elif op == "-=":
-                            vars_store[name] = (cur or 0) - rhs_val
+                            try: vars_store[name] = (cur or 0) - rhs_val
+                            except: vars_store[name] = cur
                         elif op == "*=":
-                            vars_store[name] = (cur or 0) * rhs_val
+                            try: vars_store[name] = (cur or 0) * rhs_val
+                            except: vars_store[name] = cur
                         elif op == "/=":
-                            try:
-                                vars_store[name] = (cur or 0) / rhs_val
-                            except Exception:
-                                vars_store[name] = cur
+                            try: vars_store[name] = (cur or 0) / rhs_val
+                            except: vars_store[name] = cur
                     else:
-                        # fallback: var:NAME=RHS or var:NAME (ignored)
                         if "=" in payload:
                             name, rhs = payload.split("=",1)
                             name, rhs = name.strip(), rhs.strip()
-                            try:
-                                val = safe_eval_expr(rhs, vars_store)
-                            except Exception:
-                                val = rhs
-                            vars_store[name] = val
+                            try: vars_store[name] = safe_eval_expr(rhs, vars_store)
+                            except Exception: vars_store[name] = rhs
                         else:
-                            # plain var name - set truthy 1?
                             vars_store[payload] = vars_store.get(payload, 0)
+                    continue
 
-                else:
-                    # try generic name=val update
-                    if "=" in sub:
-                        name, val_expr = sub.split("=",1)
-                        name, val_expr = name.strip(), val_expr.strip()
-                        try:
-                            vars_store[name] = safe_eval_expr(val_expr, vars_store)
-                        except Exception:
-                            vars_store[name] = val_expr
+                # ------------------ fallback: generic name=val ------------------
+                if "=" in sub:
+                    name, val_expr = sub.split("=",1)
+                    name, val_expr = name.strip(), val_expr.strip()
+                    try:
+                        vars_store[name] = safe_eval_expr(val_expr, vars_store)
+                    except Exception:
+                        vars_store[name] = val_expr
+
             except Exception:
                 continue
 
@@ -389,6 +389,28 @@ def find_dead_ends() -> List[Tuple[int, Dict]]: # finds dead ends in nodes
                 bad.append((nid, opt))
     return bad
 
+def run_instant_leaves(node_id: int) -> int:
+    while True:
+        node = nodes.get(node_id)
+        if not node:
+            return node_id
+
+        for opt_raw in node.get("options", []):
+            opt = parse_option_line(opt_raw)
+            if opt and opt.get("instant"):
+                execute_actions(opt.get("actions", []))
+
+        # handle __goto jumps set by instant leaves
+        if vars_store.get("__goto"):
+            maybe = vars_store.pop("__goto")
+            nxt_try = resolve_next(maybe)
+            if nxt_try is not None:
+                node_id = nxt_try
+                continue  # loop again to run instant leaves in the new node
+        break
+
+    return node_id
+
 NODE_W = 180 # node width
 NODE_H = 80 # node height
 COMMENT_W, COMMENT_H = 150, 50 # comment width, comment height
@@ -438,7 +460,7 @@ class VisualEditor(tk.Frame):
         self.node_base_fonts: Dict[int, tkFont.Font] = {}  
         self.current_zoom = 1.0 # all zoom features are commented out due to bugs that will be worked on in the future.
         self.multi_select_rect = None
-        self.multi_selected_nodes = set()
+        self.multi_selected_nodes = set() # set of multi selected nodes
         self.undo_stack = [] # undo stack, or 'undo list'
         self.theme = {} # define 'self.theme' for later use
 
@@ -464,6 +486,7 @@ class VisualEditor(tk.Frame):
         default_font.configure(family="Segoe UI", size=10)
         self.root.option_add("*Font", default_font)
 
+        # Focus Canvas
         tk.Button(self.toolbar, text="Focus Canvas", command=self.focus_canvas).pack(side=tk.LEFT) # focuses the canvas so you can use WASD (to move around)
 
         # Search node input
@@ -490,12 +513,15 @@ class VisualEditor(tk.Frame):
             "disable_delete_confirm": False,
             "show_path": False,
             "udtdnc": False,
+            "change_node_colors": False,
             "keybinds": {
                 "undo": "<Control-z>",
                 "redo": "<Control-Shift-Z>",
                 "redo_alt": "<Control-y>",
                 "save": "<Control-s>"
-            }
+            },
+            "default_comment_w": 150,
+            "default_comment_h": 50
         }
         self.load_settings() # load settings if path settings.json exists
 
@@ -602,7 +628,7 @@ class VisualEditor(tk.Frame):
             text_widget = event.widget
             # get current width of the frame in pixels
             width_px = text_widget.winfo_width()
-            # convert pixels → approx characters (roughly)
+            # convert pixels > approx characters (roughly)
             char_width = text_widget.winfo_fpixels("1c")
             new_width = max(int(width_px / char_width), 1)
             text_widget.config(width=new_width)
@@ -693,8 +719,6 @@ class VisualEditor(tk.Frame):
         self.master.bind("<Control-Shift-Z>", lambda e: self.redo())
         self.master.bind("<Control-y>", lambda e: self.redo())
 
-        #self.master.bind("<Control-0>", lambda e: self.reset_zoom())
-
     def apply_comment_text(self):
         if self.selected_comment is None:
             return
@@ -703,7 +727,6 @@ class VisualEditor(tk.Frame):
         self.redraw()
 
     def start_canvas_or_comment(self, event):
-        # First, check if we clicked on a comment
         x, y = self.canvas.canvasx(event.x), self.canvas.canvasy(event.y)
         self.moving_comment = None
         for cid, data in comments.items():
@@ -749,6 +772,14 @@ class VisualEditor(tk.Frame):
         elif self.selected_node is not None:
             self.apply_edits()
         self.apply_vars_text()
+
+    def change_every_node_color(self, color: str):
+        self.push_undo()
+        targets = nodes
+        for nid in targets:
+            if nid is not None:
+                nodes[nid]["color"] = color
+        self.redraw()        
 
     def themepreset(self, preset: str, changetype=None):
         if preset:
@@ -902,6 +933,36 @@ class VisualEditor(tk.Frame):
                     "preset_inner_bg": "#ffffff",
                     "preset_frame_bg": "#ffffff",
                 }
+            elif preset == 'bubblegum':
+                self.theme = {
+                    "canvas_background": "#663e5e", 
+                    "from_lines": "#ff97c9", 
+                    "to_lines": "#9C2071",
+                    "randomEdgeFromColor": "#a970d7",
+
+                    "default_node_color": "#B773AB",
+                    "node_outline": "#d6afd2",
+                    "node_selected_outline": "#ffffff",
+                    "multi_selected_outline": "#f9e2af",
+                    "node_text_fill": "#f5f5f5",
+
+                    "inspector_bg": "#3a2b37",
+                    "inspector_canvas_bg": "#3a2b37",
+                    "title_lbl_bg": "#3a2b37",
+                    "inspector_frame_bg": "#3a2b37",
+                    "inspector_container": "#573c52",
+                    "inspector_body": "#573c52",
+                    "inspector_label_bg": "#573c51",
+                    "inspector_label_bg2": "#714e6f",
+                    "inspector_header": "#714e6f",
+                    "inspector_toggle_btn": "#714e6f",
+                    "inspector_textbox_bg": "#f5f5f5",
+                    "inspector_button_bg": "#f7a6e4",
+
+                    "preset_canvas_bg": "#ffffff",
+                    "preset_inner_bg": "#ffffff",
+                    "preset_frame_bg": "#ffffff",                    
+                }
             
         try:
             #self.theme.setdefault('randomEdgeFromColor', '#8e44ff')
@@ -945,6 +1006,8 @@ class VisualEditor(tk.Frame):
                     apply_theme_recursive(child)
 
             apply_theme_recursive(self.inspector)
+            if self.settings['change_node_colors']:
+                self.change_every_node_color(self.theme.get('default_node_color', '#222222'))
 
         except Exception:
             pass
@@ -1016,7 +1079,6 @@ class VisualEditor(tk.Frame):
         return seq.replace("<Control-", "Ctrl+").replace("<Shift-", "Shift+").replace(">", "").upper()
 
     def open_settings(self):
-        #print(self.settings['show_path'])
         win = tk.Toplevel(self)
         win.title("Settings")
         ######################
@@ -1035,10 +1097,10 @@ class VisualEditor(tk.Frame):
                             command=lambda: self.settings.update(udtdnc=var2.get()))
         chk3.pack(anchor="w", pady=4)
         ######################
-        #var3 = tk.BooleanVar(value=self.settings["disable_zooming"])
-        #chk4 = tk.Checkbutton(win, text="Disable zooming", variable=var3,
-        #                    command=lambda: self.settings.update(disable_zooming=var3.get()))
-        #chk4.pack(anchor="w", pady=4)
+        var3 = tk.BooleanVar(value=self.settings["change_node_colors"])
+        chk4 = tk.Checkbutton(win, text="Change all node colors to themes default node color after switching to a theme preset.", variable=var3,
+                            command=lambda: self.settings.update(change_node_colors=var3.get()))
+        chk4.pack(anchor="w", pady=4)
         ######################
         tk.Label(win, text="Keybinds:").pack(anchor="w", pady=(10,0))
         for action, seq in self.settings["keybinds"].items():
@@ -1066,8 +1128,9 @@ class VisualEditor(tk.Frame):
         tk.Button(self.win, text='Default', command=lambda: self.themepreset('default', 1)).pack(side=tk.TOP, pady=4)
         tk.Button(self.win, text='Cherries', command=lambda: self.themepreset('cherries', 1)).pack(side=tk.TOP, pady=4)
         tk.Button(self.win, text='Ocean', command=lambda: self.themepreset('ocean', 1)).pack(side=tk.TOP, pady=4)
+        tk.Button(self.win, text='Ocean (v2)', command=lambda: self.themepreset('ocean 2', 1)).pack(side=tk.TOP, pady=4) 
         tk.Button(self.win, text='Forest', command=lambda: self.themepreset('forest', 1)).pack(side=tk.TOP, pady=4)
-        tk.Button(self.win, text='Ocean (v2)', command=lambda: self.themepreset('ocean 2', 1)).pack(side=tk.TOP, pady=4)
+        tk.Button(self.win, text='Bubblegum', command=lambda: self.themepreset('bubblegum', 1)).pack(side=tk.TOP, pady=4)        
 
     def update_node_count(self):
         self.node_count_label.config(text=f"Nodes: {len(self.node_rects)}")
@@ -1103,20 +1166,39 @@ class VisualEditor(tk.Frame):
         self.settings["disable_delete_confirm"] = self.delete_confirm_var.get()    
         self.settings["show_path"] = self.show_path.get()    
         self.settings["udtdnc"] = self.udtdnc.get() 
+        self.settings["change_node_colors"] = self.change_node_colors.get() 
+        self.settings['default_comment_w'] = self.default_comment_w.get()
+        self.settings['default_comment_h'] = self.default_comment_h.get()
         #self.settings["disable_zooming"] = self.disable_zooming.get() 
 
     def add_node_prompt(self):
+        w, h = self.canvas.winfo_width(), self.canvas.winfo_height()
+        x, y = self.canvas.canvasx(w / 2), self.canvas.canvasy(h / 2)        
         nid = simpledialog.askinteger("Add Node", "Node ID (int):", minvalue=1)
         if nid is None:
             return
         if nid in nodes:
             if not messagebox.askyesno("Overwrite?", f"Node {nid} exists — overwrite?"):
                 return
-        create_node(nid, header=f"Node {nid}", x=100, y=100)
         self.selected_node = nid
+
+        # Color logic
+        if self.settings.get('udtdnc', False) == False:
+            color = '#222222'
+        else:
+            color = self.theme['default_node_color']
+
+        # Create node
+        nodes[nid] = {
+            "x": x,
+            "y": y,
+            "header": f"Node {nid}",
+            "options": [],
+            "color": color     
+        }
+        #create_node(nid, f'Node {nid}', x, y, )
+        self.push_undo()
         self.redraw()
-        self.load_selected_into_inspector()
-        self.update_node_count()
 
     def push_undo(self):
         state = {
@@ -1183,7 +1265,6 @@ class VisualEditor(tk.Frame):
         self.redraw()
 
     def center_canvas_on(self, cx, cy):
-        """Center the canvas view so that canvas coordinate (cx,cy) ends up in the viewport center."""
         # ensure geometry & items are up to date
         self.canvas.update_idletasks()
 
@@ -1233,7 +1314,6 @@ class VisualEditor(tk.Frame):
         self.canvas.yview_moveto(frac_y)
 
     def search_node(self, event=None):
-        """Search node by id (from self.search_var), select it and center on it."""
         nid_str = self.search_var.get().strip()
         if not nid_str.isdigit():
             return
@@ -1627,7 +1707,7 @@ class VisualEditor(tk.Frame):
                 x, y = self.canvas.canvasx(w / 2), self.canvas.canvasy(h / 2)
 
         # Color logic
-        if self.settings.get('udtdnc', False):
+        if self.settings.get('udtdnc', False) == False:
             color = '#222222'
         else:
             color = self.theme['default_node_color']
@@ -1891,7 +1971,6 @@ class VisualEditor(tk.Frame):
                 # ensure no handles stored for unselected comments
                 data["handles"] = {}
 
-
     def select_comment(self, event): # selects a comment
         x, y = self.canvas.canvasx(event.x), self.canvas.canvasy(event.y)
         for cid, data in comments.items():
@@ -2088,12 +2167,14 @@ class VisualEditor(tk.Frame):
                 x, y = self.canvas.canvasx(w / 2), self.canvas.canvasy(h / 2)
 
         cid = max(comments.keys(), default=0) + 1
+        width = self.settings.get('default_comment_w', COMMENT_W)
+        height = self.settings.get('default_comment_h', COMMENT_H)
         comments[cid] = {
             "text": text,
             "x": x,
             "y": y,
-            "w": COMMENT_W,
-            "h": COMMENT_H
+            "w": width,
+            "h": height
         }
         self.selected_comment = cid
         self.redraw()
@@ -2292,12 +2373,86 @@ class VisualEditor(tk.Frame):
             return str(vars_store.get(key, f"{{{key}}}"))
         return re.sub(r"\{(\w+)\}", repl, text)
  
+
+    def toggle_mode(self): # toggle mode (play>editor, editor>play)
+        if self.mode == "editor":
+            self.enter_play_mode()
+        else:
+            self.enter_editor_mode()
+
+    def enter_play_mode(self): # enter play mode
+        self.mode = "play"
+        self.mode_button.config(text="Switch to Editor Mode")
+        self.reset_state()
+        self.play_window = tk.Toplevel(self.master)
+        self.play_window.title("Play Mode")
+        self.play_window.geometry("480x360")
+
+        self.play_window.protocol("WM_DELETE_WINDOW", self.close_play)       
+
+        tk.Label(self.play_window, text=f"Play Mode").pack()
+        self.play_area = tk.Frame(self.play_window)
+        self.play_area.pack(fill=tk.BOTH, expand=True)
+        self.play_header = tk.Label(self.play_area, text="", wraplength=440, justify="left", font=("TkDefaultFont", 11))
+        self.play_header.pack(pady=(10,5))
+        self.choice_frame = tk.Frame(self.play_area)
+        self.choice_frame.pack(pady=(6,10))
+        ctrl = tk.Frame(self.play_window)
+        ctrl.pack(fill=tk.X)
+        tk.Button(ctrl, text="Restart", command=self.play_restart).pack(side=tk.LEFT)
+        #tk.Button(ctrl, text="Reset vars/inv", command=self.reset_state).pack(side=tk.LEFT)
+        #tk.Button(ctrl, text="Close Play", command=self.close_play).pack(side=tk.RIGHT)
+        self.play_current = START_NODE
+        self.play_path = []
+        self.play_render_current()
+
+    def enter_editor_mode(self): # enter editor mode
+        self.mode = "editor"
+        self.mode_button.config(text="Switch to Play Mode")
+        try:
+            self.play_window.destroy()
+        except Exception:
+            pass
+
+    def close_play(self): # close play
+        self.enter_editor_mode()
+
+    def reset_state(self): # reset state (variables and inventory for play mode)
+        vars_store.clear()
+        inventory.clear()
+        defaults = self.vars_list.get("1.0", tk.END).strip().splitlines()
+        for line in defaults:
+            line = line.strip()
+            if not line:
+                continue
+            if line.startswith("inv:"):
+                item = line.split(":", 1)[1].strip()
+                if item:
+                    inventory.append(item)
+            elif "=" in line:
+                name, val = line.split("=", 1)
+                name, val = name.strip(), val.strip()
+                try:
+                    vars_store[name] = safe_eval_expr(val, vars_store)
+                except Exception:
+                    vars_store[name] = val
+
+    def play_restart(self): # restart the play [mode] session
+        self.reset_state()
+        self.play_current = START_NODE; self.play_path = []; self.play_render_current()
+
+    @staticmethod
+    def substitute_vars(text: str) -> str: # substitute variables, used for inline variable support such as "Clicks: {CLICSKS}" ({CLICKS} gets replaced with the variable 'CLICKS' if it exists)
+        if not text:
+            return ""
+        def repl(match):
+            key = match.group(1)
+            return str(vars_store.get(key, f"{{{key}}}"))
+        return re.sub(r"\{(\w+)\}", repl, text)
+    
     def play_render_current(self):
-        if vars_store.get("__goto"):
-            maybe = vars_store.pop("__goto")
-            nxt_try = resolve_next(maybe)
-            if nxt_try is not None:
-                self.play_current = nxt_try
+        # --- Run instant leaves & handle cascading gotos ---
+        self.play_current = run_instant_leaves(self.play_current)
 
         if self.play_current not in nodes:
             if self.settings.get('show_path', True):
@@ -2313,11 +2468,16 @@ class VisualEditor(tk.Frame):
         node = nodes[self.play_current]
         self.play_path.append(self.play_current)
 
+        # substitute variables in header
         header_text = self.substitute_vars(node.get("header", ""))
         self.play_header.config(text=header_text)
 
+        # --- Gather visible normal leaves ---
         visible = []
-        for opt in node.get("options", []):
+        for opt_raw in node.get("options", []):
+            opt = parse_option_line(opt_raw)
+            if not opt or opt.get("instant"):  # skip instant leaves
+                continue
             if evaluate_condition(opt.get("condition")):
                 visible.append(opt)
 
@@ -2345,6 +2505,20 @@ class VisualEditor(tk.Frame):
                 command=lambda o=opt: self.play_pick(o)
             )
             btn.pack(pady=2)
+
+    def play_pick(self, opt):
+        execute_actions(opt.get("actions", []))
+        nxt = resolve_next(opt.get("next"))
+        if nxt is None:
+            self.play_header.config(text="[THE END]")
+            for w in self.choice_frame.winfo_children():
+                w.destroy()
+            tk.Button(self.choice_frame, text="Play Again", command=self.play_restart).pack(pady=(6,0))
+            tk.Button(self.choice_frame, text="Close Play", command=self.close_play).pack(pady=(6,0))
+            return
+
+        self.play_current = run_instant_leaves(nxt)
+        self.play_render_current()
 
     def play_pick(self, opt):
         execute_actions(opt.get("actions",[]))
