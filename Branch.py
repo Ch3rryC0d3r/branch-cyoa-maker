@@ -27,7 +27,7 @@ v0.5.02.03 - fixed 'search_node' you can now use Ctrl+F type a number then press
 """
 
 # built-ins
-import os, re, ast, math, json, copy, random, operator
+import os, re, ast, math, json, copy, random, operator, threading
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 # tkinter
@@ -35,6 +35,10 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, simpledialog, colorchooser
 import tkinter.font as tkFont
 import tkinter.ttk as ttk
+
+# playsound
+from playsound import playsound
+
 
 _ALLOWED_MATH_FUNCS = { # allowed (math) functions
     'sin': math.sin, 'cos': math.cos, 'tan': math.tan, 'sqrt': math.sqrt,
@@ -220,6 +224,93 @@ def execute_actions(actions: List[str]):
                     cond_expr, act_expr = m_if.group(1).strip(), m_if.group(2).strip()
                     if evaluate_condition(cond_expr):
                         execute_actions([act_expr])
+                    continue
+
+                # ------------------ play:SOUND ------------------
+                if sub.startswith("play:"):
+                    sound_name = sub.split(":", 1).strip()
+                    if sound_name:
+                        path = os.path.join("./sounds", sound_name)
+                        def _play():
+                            try:
+                                playsound(path)
+                            except Exception as e:
+                                print(f"[WARN] could not play sound {path}: {e}")
+                        threading.Thread(target=_play, daemon=True).start()
+                    continue
+
+                # ------------------ once:ACT ------------------
+                if sub.startswith("once:"):
+                    act_expr = sub.split(":", 1)[1].strip()
+                    if "__once_memory" not in vars_store:
+                        vars_store["__once_memory"] = set()
+                    once_mem = vars_store["__once_memory"]
+
+                    if act_expr not in once_mem:
+                        once_mem.add(act_expr)
+                        execute_actions([act_expr])
+                    continue
+
+                # ------------------ chance(CHANCE)>ACT>ELSE ------------------
+                m_chance = re.match(r"^chance\((.+)\)>(.+)>(.+)$", sub)
+                if m_chance:
+                    chance_expr, act_expr, else_expr = (
+                        m_chance.group(1).strip(),
+                        m_chance.group(2).strip(),
+                        m_chance.group(3).strip()
+                    )
+                    try:
+                        chance_val = float(safe_eval_expr(chance_expr, vars_store))
+                    except Exception:
+                        chance_val = float(chance_expr) if chance_expr.replace('.','',1).isdigit() else 0
+                    roll = random.uniform(0, 100)
+                    if roll <= chance_val:
+                        execute_actions([act_expr])
+                    else:
+                        execute_actions([else_expr])
+                    continue
+
+                # ------------------ repeat:TIMES>ACT ------------------
+                m_repeat = re.match(r"^repeat:(.+)>(.+)$", sub)
+                if m_repeat:
+                    times_expr = m_repeat.group(1).strip()
+                    act_expr = m_repeat.group(2).strip()
+                    try:
+                        times = int(safe_eval_expr(times_expr, vars_store))
+                    except Exception:
+                        try:
+                            times = int(times_expr)
+                        except:
+                            times = 0
+                    for _ in range(max(0, times)):
+                        execute_actions([act_expr])
+                    continue
+
+                # ------------------ weighted(VAR: item=weight, ...) ------------------
+                if sub.startswith("weighted(") and sub.endswith(")"):
+                    payload = sub[9:-1].strip()
+                    if ":" in payload:
+                        varname, items = payload.split(":", 1)
+                        varname = varname.strip()
+                        choices, weights = [], []
+                        for pair in items.split(","):
+                            if "=" in pair:
+                                item, weight = pair.split("=", 1)
+                                item, weight = item.strip(), weight.strip()
+                                try:
+                                    w = float(safe_eval_expr(weight, vars_store))
+                                except Exception:
+                                    try: w = float(weight)
+                                    except: w = 1.0
+                                choices.append(item)
+                                weights.append(w)
+                        if choices and weights:
+                            vars_store[varname] = random.choices(choices, weights=weights, k=1)[0]
+                    continue
+
+                # ------------------ clearinv ------------------
+                if sub == "clearinv":
+                    inventory.clear()
                     continue
 
                 # ------------------ assignment without var: (X=5, Y+=2, etc) ------------------
