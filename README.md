@@ -52,16 +52,19 @@ Branch is packed with features to make story creation intuitive and powerful.
 
 ## 🛠️ Installation
 
-Branch is a single-file Python script with no external dependencies.
+⚠️ To enable sound support (`play:SOUND`), you’ll also need the [`playsound`](https://pypi.org/project/playsound/) library:
 
-1.  **Clone the repository:**
+1. ```bash
+    pip install playsound
+    ```
+2.  **Clone the repository:**
     ```bash
     git clone https://github.com/Ch3rryC0d3r/branch-cyoa-maker.git
     cd branch-cyoa-maker
     ```
     Alternatively, you can just download `Branch.py` directly.
 
-2.  **Run the script:**
+3.  **Run the script:**
     Make sure you have **Python 3.8+** installed (Tkinter is usually included).
     ```bash
     python Branch.py
