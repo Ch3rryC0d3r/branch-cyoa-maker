@@ -10,7 +10,7 @@
 
 ## ✨ What is Branch?
 
-Branch is a standalone tool that lets you build branching narratives visually, without needing to write complex code. It combines a node-based editor with a powerful logic system, allowing you to create dynamic stories with variables, conditions, and an inventory system. When you're ready, you can instantly playtest your creation right inside the app.
+Branch is a standalone tool that lets you build branching narratives visually, without needing to write complex code. It combines a node-based editor with a powerful logic system, allowing you to create dynamic stories with variables, conditions, inventory, and even sound effects. When you're ready, you can instantly playtest your creation right inside the app.
 
 <p align="center">
   <img src="Interface.png" alt="Editor Screenshot" width="800">
@@ -25,50 +25,45 @@ Branch is packed with features to make story creation intuitive and powerful.
 #### Core Editing
 - **Visual Node Editor:** Drag and drop nodes to build your story flow.
 - **Live Inspector:** Instantly edit node content, options, and colors.
-- **Undo/Redo:** Full undo/redo support for nearly all actions.
-- **Multi-Select:** Select, move, and delete multiple nodes at once.
-- **Comments:** Add resizable comment boxes to organize your canvas.
-- **Search:** Quickly find and center on any node by its ID (`Ctrl+F`).
-- **Easy Navigation:** Pan the canvas with the middle mouse button or `WASD` keys.
+- **Undo/Redo:** Full undo/redo support.
+- **Multi-Select & Comments:** Organize your canvas easily.
+- **Search & Navigation:** `Ctrl+F` to jump to nodes, pan with `WASD` or middle drag.
 
 #### Powerful Logic System
-- **Variables & Inventory:** Use variables and a player inventory to track story state.
-- **Conditions:** Show or hide choices based on variables or items (`gold > 10 & has_item:key`).
-- **Actions:** Modify variables, grant items, or force jumps (`gold+=10`, `add_item:sword`).
-- **Conditional Actions:** Run an action only if a condition is met (`if(HP<=0)>goto:GameOver`).
-- **Instant Actions:** Trigger logic as soon as a node is entered, before the player chooses (`@HP-=5`).
+- **Variables & Inventory:** Track player state.
+- **Conditions:** Control option visibility.
+- **Actions:** Modify variables, grant/remove items, or redirect story.
+- **Advanced Actions:** Support for instant (`@`), conditional (`if`), once-only (`once:`), delays, loops, weighted choices, chance-based actions, and more.
 
 #### Dynamic Content
-- **Variable Substitution:** Display variable values directly in your story text (`Your gold: {gold}`).
-- **Randomization:** Create unpredictable outcomes with **Random Branching** (`next: 1/2/3`) and **Random Actions** (`rands(mood:happy,sad)`).
+- **Variable Substitution:** Embed `{var}` directly into text.
+- **Randomization:** Supports random branching, random variables, weighted distributions, and chance checks.
+- **Sound Support:** Play background music or sound effects (`play`, `loop_sound`, `stop_sound`) with `pygame`.
 
 #### Workflow & Customization
-- **Integrated Play Mode:** Instantly playtest your story in a separate window.
-- **Customizable Themes:** Includes several built-in themes (dark, light, and colorful). Your last used theme is saved automatically.
-- **Custom Keybinds:** Modify keybinds and editor behavior via `settings.json`.
-- **Simple Data Format:** Save and load stories as human-readable **JSON** files.
+- **Integrated Play Mode** for instant testing.
+- **Customizable Themes & Keybinds** via JSON configs.
+- **Simple JSON Save Format** for your projects.
 
 ---
 
 ## 🛠️ Installation
 
-⚠️ To enable sound support (`play:SOUND`), you’ll also need the [`pygame`](https://pypi.org/project/pygame/) library:
+⚠️ For sound support (`play:SOUND`, `loop_sound`, `stop_sound`), install [`pygame`](https://pypi.org/project/pygame/):
 
-1. ```bash
-    pip install pygame
-    ```
-2.  **Clone the repository:**
-    ```bash
-    git clone https://github.com/Ch3rryC0d3r/branch-cyoa-maker.git
-    cd branch-cyoa-maker
-    ```
-    Alternatively, you can just download `Branch.py` directly.
+```bash
+pip install pygame
+```
 
-3.  **Run the script:**
-    Make sure you have **Python 3.8+** installed (Tkinter is usually included).
-    ```bash
-    python Branch.py
-    ```
+Clone the repo and run:
+
+```bash
+git clone https://github.com/Ch3rryC0d3r/branch-cyoa-maker.git
+cd branch-cyoa-maker
+python Branch.py
+```
+
+Requires **Python 3.8+** (Tkinter is included by default).
 
 ---
 
@@ -96,90 +91,31 @@ Each choice in a node is called a **Leaf**. A Leaf is a single line of text in t
 Text | Next | Condition | Actions
 ```
 
-👉 For a quick reference, check out the **Leaves Documentation**.
+Examples:
+- `Take sword | 5 | has_item:key | add_item:sword`
+- `Attack | 10 | stamina>5 | @stamina-=5; randr(damage:1,6)`
+- `Explore | 2 | | play:steps.wav; delay:500; goto:3`
+- `Treasure | | | weighted(Loot, Gold=70, Gem=30)`
 
-#### 1. Text
-This is the text the player sees for the choice. You can embed variables using curly braces.
-
-`"Hello, {player_name}!"`
-
-#### 2. Next
-The ID of the node to go to when this option is chosen.
-
-- **Single Node:** `5` (goes to node 5)
-- **Random Node:** `5/6/7` (randomly goes to node 5, 6, or 7)
-- **End of Path:** Leave this blank to end the story here.
-
-#### 3. Condition
-An optional rule that must be true for the option to be visible. You can chain multiple conditions with `&` or `;`.
-
-| Type | Example | Description |
-| :--- | :--- | :--- |
-| Has Item | `has_item:key` | Player has "key" in their inventory. |
-| Not Has Item | `not_has_item:sword` | Player does *not* have "sword". |
-| Variable Check | `gold >= 10` | The `gold` variable is 10 or more. |
-| Chained | `has_item:key & gold>5` | Both conditions must be true. |
-
-#### 4. Actions
-A list of actions to execute when the option is chosen, separated by `&` or `;`.
-
-| Type | Example | Description |
-| :--- | :--- | :--- |
-| **Variable** | | |
-| Set | `gold = 100` | Sets `gold` to 100. |
-| Modify | `gold += 10` | Adds 10 to `gold`. Also supports `-=`, `*=`, `/=`. |
-| **Inventory** | | |
-| Add Item | `add_item:potion` | Adds "potion" to inventory. |
-| Remove Item | `remove_item:key` | Removes "key" from inventory. |
-| **Flow Control** | | |
-| Go To | `goto:50` | Immediately jumps to node 50. |
-| **Random** | | |
-| Random String | `rands(mood:happy,sad)` | Sets `mood` to either "happy" or "sad". |
-| Random Range | `randr(damage:5,20)` | Sets `damage` to a random number between 5 and 20. |
-| **Advanced** | | |
-| Instant Action | `@stamina -= 1` | Runs when the node is *entered*, not chosen. |
-| Conditional Action | `if(is_tired==1)>stamina=0` | Runs the action only if the `if` condition is met. |
-
----
-
-### Example Leaf
-
-Here is a complex leaf that uses all the parts:
-
-```
-Attack the guard | 15 | has_item:sword & stamina>20 | @stamina-=10; if(boss_is_weak==1)>goto:16
-```
-
-- **Text:** "Attack the guard"
-- **Next:** Goes to node `15`.
-- **Condition:** Only visible if the player has a `sword` and `stamina` is greater than 20.
-- **Actions:**
-  1.  `@stamina-=10`: The player loses 10 stamina just for entering the node this leaf is in.
-  2.  `if(boss_is_weak==1)>goto:16`: If the variable `boss_is_weak` is 1, the player is immediately redirected to node `16` instead of `15`.
+👉 Full list of actions is documented in [Leaves Documentation](Leaves.html).
 
 ---
 
 ## 💾 Saving & Loading
 
--   **Save:** Go to `App → Save (Ctrl+S)`. Your story, including node positions, variables, and inventory defaults, will be saved to a `.json` file in the `./saves/` folder.
--   **Load:** Go to `App → Load` and select a `.json` story file.
+- **Save:** `App → Save (Ctrl+S)` saves your story into `./saves/`.
+- **Load:** `App → Load` lets you pick a `.json` file to load.
 
 ## 🎨 Customization
 
 #### Theming
-Open the **Theme Control** window from the toolbar to switch between several built-in visual styles. Your current theme is automatically saved to `theme.json` and will be loaded the next time you open the app.
+Switch themes in the **Theme Control** window. Saved in `theme.json`.
 
 #### Settings
-Open the **Settings** window from the toolbar to configure:
--   **Keybinds:** Change the default keyboard shortcuts for actions like Undo, Redo, and Save.
--   **Editor Behavior:** Toggle confirmation dialogs, default node colors, and more.
-
-Your settings are saved to `settings.json`.
+Configure keybinds and editor behavior in **Settings**. Saved in `settings.json`.
 
 ---
 
 ## 📜 License
 
 This project is licensed under the MIT License.
-
-
