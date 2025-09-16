@@ -52,10 +52,10 @@ Branch is packed with features to make story creation intuitive and powerful.
 
 ## 🛠️ Installation
 
-⚠️ To enable sound support (`play:SOUND`), you’ll also need the [`playsound`](https://pypi.org/project/playsound/) library:
+⚠️ To enable sound support (`play:SOUND`), you’ll also need the [`pygame`](https://pypi.org/project/pygame/) library:
 
 1. ```bash
-    pip install playsound
+    pip install pygame
     ```
 2.  **Clone the repository:**
     ```bash
