@@ -49,7 +49,7 @@ Branch is packed with features to make story creation intuitive and powerful.
 
 ## 🛠️ Installation
 
-⚠️ For sound support (`play:SOUND`, `loop_sound`, `stop_sound`), install [`pygame`](https://pypi.org/project/pygame/):
+⚠️ For sound support (`play:SOUND`), install [`pygame`](https://pypi.org/project/pygame/):
 
 ```bash
 pip install pygame
