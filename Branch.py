@@ -1,31 +1,47 @@
 """ 
 Branch, a CYOA (Choose-Your-Own-Adventure) Maker.
-Version: v0.5.02.11
+Version: v0.5.02.13
 
 ******************************************To Do******************************************
-@1@ Fix zooming. Calling 'redraw()' never drawed the nodes with sizes based on the 'current_zoom', 
-    I've tried before, however, the node offset way too far (~ 1,-1) each time I tried to dragged a node.
 
+@1@ Fix zooming and fully re-add it [zooming]. Calling 'redraw()' never drawed the nodes with sizes based on the 'current_zoom', 
+    I've tried before, however, the node offset way too far (~ 1,-1) each time I tried to dragged a node.
+    
 @2@ Add a 'Change ID' in the node right-click menu. 
 
-@3@ 'truncate_text_to_fit()' doesn't acknowledge a                                                                                                                                                                                                                                                                                                                                                                                                                                              ny returned lines, just words+chars. 
-    [make it where it does truncate based on returned lines]
-
-@4@ Add a setting field for 'default comment width' and 'default comment height' 
+@3@ Add a setting field for 'default comment width' and 'default comment height' 
     (added, however, I didn't add visual fields in the 'open_settings()' 
     only the actual settings in the default settings.json{})
+
+@4@ Option line template button (adds a template like, line1:'Template | 1 |  | ', or the next available 
+    (not max+1, the min available) line due to the user might have some already written lines.)
+
+@5@ Themes to add: 
+    1. Underground Theme (brown/cave-style, maybe nodes are 'lights' (like yellow I mean) and the background and whatnot is shades of brown or gray)
+    2. Sky Theme (nodes could be "clouds" and bg and the other stuff is the sky)
+    3. Night Sky Theme (same as sky but nodes are 'stars' and the background and other stuff is darker, like a dark mode theme of the 'Sky' theme)
+    4. Lemon Theme (soft yellow)
+    5. 80s (or was it the 90s?) Theme (all black/white)
+
+@6@ inline leaf comment support, in leaves you can add '#' at the start for that line to be ignored
+
+@7@ add a setting, 'disable text truncation'.
+
+@8@ add a setting, 'pan speed'.
+
+@9@ make it where you can't move nodes while you're panning, I think you can as of now.
+
+@10@ truncate_text_to_fit() works if you return lines, however, it does not when you don't return at all, like in 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' for example.
 ********************************************************************************************
 
 Changelog:
-v0.5.02.11 - remove sound support due to bug, will add back later.
-v0.5.02.10 - Added sound commands for leaves (play:SOUND[.ext]) Example: play:page_turn.mp3 | the directory for sounds is at ./sounds/ || Added once:ACTION, chance:CHANCE>ACTION>ELSE, repeat:TIMES, weighted(VAR, item=weight, ...).
-v0.5.02.09 - Changed 'bubblegum' theme preset.
-v0.5.02.08 - Play mode render bugfix.
-v0.5.02.07 - Added Instant Action(s) to leaves ("@-action") and if support, like "if(CONDITION)>ACTION", and changed rand_set to rands and added randr (random range).
-v0.5.02.06 - Fixed node coloration settings. ('change_node_colors' + 'udtdnc') ["udtdnc" stands  for use default themes' default node color, [always]. (when creating a new node)]
-v0.5.02.05 - Fixed deletion bugs
-v0.5.02.04 - "(Quick) Add Node" adds the node with the next AVAILABLE id, previously (v0.5.02.03 and since) did "max node id + 1".
-v0.5.02.03 - fixed 'search_node' you can now use Ctrl+F type a number then press enter to find a node.
+v0.5.02.13 - 
+    * Fixed if(...)> parsing so only the first action is executed by default.
+    * Added >> operator for if(...)>>ACTION to execute all actions after it as a single block.
+    * Ensures multi-action statements like if(gold>=price)>>potions+=1;gold-=price;price*=2 now work as expected.
+    * Improved consistency for conditional and repeatable actions parsing.
+    
+...truncated changelog due to length...
 """
 
 # built-ins
@@ -37,11 +53,6 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, simpledialog, colorchooser
 import tkinter.font as tkFont
 import tkinter.ttk as ttk
-
-# playsound
-#import pygame
-#pygame.mixer.init()
-#_sound_cache = {}
 
 _ALLOWED_MATH_FUNCS = { # allowed (math) functions
     'sin': math.sin, 'cos': math.cos, 'tan': math.tan, 'sqrt': math.sqrt,
@@ -122,7 +133,8 @@ def safe_eval_expr(expr: str, names: dict): # evaluates an expression safely
             return all(results)
         raise ValueError(f"Unsupported AST: {type(n)}")
 
-    return _eval(node)
+    ret = _eval(node)
+    return ret
 
 # dictionaries and whatnot
 nodes: Dict[int, Dict] = {}
@@ -210,8 +222,11 @@ def execute_actions(actions: List[str]):
         if not act:
             continue
 
-        # split multiple actions by & or ;
-        subs = [s.strip() for s in re.split(r'[&;]', act) if s.strip()]
+        if act.startswith('if('):
+            subs = [s.strip() for s in re.split(r'[&;]', act) if s.strip()] ## for now do same as normally but make it where it's just one full action later instead of it being seperated.            
+        else:
+            # split multiple actions by & or ;
+            subs = [s.strip() for s in re.split(r'[&;]', act) if s.strip()]
 
         for sub in subs:
             try:
@@ -221,12 +236,22 @@ def execute_actions(actions: List[str]):
                     execute_actions([instant_act])
                     continue
 
-                # ------------------ if(COND)>ACT ------------------
-                m_if = re.match(r"^if\((.+)\)>(.+)$", sub)
+                # ------------------ if(COND)>ACT or if(COND)>>ACTS ------------------
+                m_if = re.match(r"^if\((.+?)\)(>>?)(.+)$", sub)
                 if m_if:
-                    cond_expr, act_expr = m_if.group(1).strip(), m_if.group(2).strip()
-                    if evaluate_condition(cond_expr):
-                        execute_actions([act_expr])
+                    cond_expr = m_if.group(1).strip()
+                    separator = m_if.group(2)  # '>' or '>>'
+                    act_expr = m_if.group(3).strip()
+
+                    if separator == '>':
+                        # only the first action after '>' is executed
+                        first_act = re.split(r'[&;]', act_expr, 1)[0].strip()
+                        if evaluate_condition(cond_expr):
+                            execute_actions([first_act])
+                    else:  # separator == '>>'
+                        # everything after '>>' is executed as a single block
+                        if evaluate_condition(cond_expr):
+                            execute_actions([act_expr])
                     continue
 
                 # ------------------ once:ACT ------------------
@@ -241,13 +266,13 @@ def execute_actions(actions: List[str]):
                         execute_actions([act_expr])
                     continue
 
-                # ------------------ chance(CHANCE)>ACT>ELSE ------------------
-                m_chance = re.match(r"^chance\((.+)\)>(.+)>(.+)$", sub)
+                # ------------------ chance(CHANCE)>ACT(>ELSE) ------------------
+                m_chance = re.match(r"^chance\((.+)\)>(.+?)(?:>(.+))?$", sub)
                 if m_chance:
                     chance_expr, act_expr, else_expr = (
                         m_chance.group(1).strip(),
                         m_chance.group(2).strip(),
-                        m_chance.group(3).strip()
+                        m_chance.group(3).strip() if m_chance.group(3) else None
                     )
                     try:
                         chance_val = float(safe_eval_expr(chance_expr, vars_store))
@@ -256,7 +281,7 @@ def execute_actions(actions: List[str]):
                     roll = random.uniform(0, 100)
                     if roll <= chance_val:
                         execute_actions([act_expr])
-                    else:
+                    elif else_expr:
                         execute_actions([else_expr])
                     continue
 
@@ -332,7 +357,6 @@ def execute_actions(actions: List[str]):
                         except: vars_store[name] = cur
                     continue
 
-                # ------------------ the rest of the actions ------------------
                 # add_item/remove_item
                 if sub.startswith("add_item:"):
                     name = sub.split(":",1)[1].strip()
@@ -505,6 +529,21 @@ NODE_W = 180 # node width
 NODE_H = 80 # node height
 COMMENT_W, COMMENT_H = 150, 50 # comment width, comment height
 HANDLE_SIZE = 8  # size of draggable corner handles on comments
+DEFAULT_SETTINGS = {
+    "disable_delete_confirm": False,
+    "show_path": False,
+    "udtdnc": False,
+    "change_node_colors": False,
+    "keybinds": {
+        "undo": "<Control-z>",
+        "redo": "<Control-Shift-Z>",
+        "redo_alt": "<Control-y>",
+        "save": "<Control-s>"
+    },
+    "default_comment_w": 150,
+    "default_comment_h": 50,
+    'disable_text_truncation': False
+}
 
 class VisualEditor(tk.Frame):
     def make_collapsible_section(self, parent, title): # makes a collpasible section, such as what you see in the Node Inspector.
@@ -599,20 +638,7 @@ class VisualEditor(tk.Frame):
         self.node_count_label.pack(side=tk.RIGHT, padx=6)
 
         # default settings
-        self.settings = {
-            "disable_delete_confirm": False,
-            "show_path": False,
-            "udtdnc": False,
-            "change_node_colors": False,
-            "keybinds": {
-                "undo": "<Control-z>",
-                "redo": "<Control-Shift-Z>",
-                "redo_alt": "<Control-y>",
-                "save": "<Control-s>"
-            },
-            "default_comment_w": 150,
-            "default_comment_h": 50
-        }
+        self.settings = DEFAULT_SETTINGS
         self.load_settings() # load settings if path settings.json exists
 
         tk.Button(self.toolbar, text="Settings", command=self.open_settings).pack(side=tk.LEFT) # settings button
@@ -1181,6 +1207,11 @@ class VisualEditor(tk.Frame):
         chk2 = tk.Checkbutton(win, text="Disable deletion confirmation", variable=var,
                             command=lambda: self.settings.update(disable_delete_confirm=var.get()))
         chk2.pack(anchor="w", pady=4)
+        ######################
+        var01 = tk.BooleanVar(value=self.settings["disable_text_truncation"])
+        chk01 = tk.Checkbutton(win, text="Disable text truncation ('...')", variable=var01,
+                            command=lambda: self.settings.update(disable_text_truncation=var01.get()))
+        chk01.pack(anchor="w", pady=4)        
         ######################
         var2 = tk.BooleanVar(value=self.settings["udtdnc"])
         chk3 = tk.Checkbutton(win, text="Use default themes' default node color, always.", variable=var2,
@@ -1819,42 +1850,54 @@ class VisualEditor(tk.Frame):
     def truncate_text_to_fit(self, text, font, max_w, max_h):
         linespace = font.metrics("linespace")
         max_lines = max(1, max_h // max(1, linespace))
-        words = text.split(' ')
         lines = []
-        current_line = ""
         truncated = False
-
-        for word in words:
-            test_line = (current_line + " " + word).strip() if current_line else word
-            if font.measure(test_line) <= max_w:
-                current_line = test_line
-            else:
-                lines.append(current_line)
-                current_line = word
-                if len(lines) >= max_lines:
-                    truncated = True
-                    break
-
-        if current_line:
-            if len(lines) < max_lines:
-                lines.append(current_line)
-            else:
+        if self.settings['disable_text_truncation'] == True:
+            return text
+        for user_line in text.split('\n'):
+            if len(lines) >= max_lines:
                 truncated = True
+                break
+
+            words = user_line.split(' ')
+            current_line = ""
+            for word in words:
+                test_line = (current_line + " " + word).strip() if current_line else word
+                if font.measure(test_line) <= max_w:
+                    current_line = test_line
+                else:
+                    if len(lines) < max_lines:
+                        lines.append(current_line)
+                        current_line = word
+                    else:
+                        truncated = True
+                        break
+
+            if not truncated:
+                if len(lines) < max_lines:
+                    lines.append(current_line)
+                else:
+                    truncated = True
+            
+            if truncated:
+                
+                break
 
         if len(lines) > max_lines:
             lines = lines[:max_lines]
             truncated = True
-
-        # final check: last line too wide?
-        if lines:
+        
+        if truncated and lines:
             last_line = lines[-1]
-            if font.measure(last_line) > max_w:
-                truncated = True
-
-            if truncated:
-                while font.measure(last_line + "…") > max_w and last_line:
-                    last_line = last_line[:-1]
-                lines[-1] = last_line + "…" if last_line else "…"
+            # Ensure last line itself isn't too wide (it might be from a single long word)
+            while font.measure(last_line) > max_w and last_line:
+                last_line = last_line[:-1]
+            
+            # Add ellipsis, making sure it fits
+            while font.measure(last_line + "...") > max_w and last_line:
+                last_line = last_line[:-1]
+            
+            lines[-1] = last_line + "..." if last_line else "..."
 
         return "\n".join(lines)
 
@@ -2386,6 +2429,8 @@ class VisualEditor(tk.Frame):
         self.selected_node = None
         self.redraw()
         self.update_node_count()
+        self.selected_node = 1
+        self.load_selected_into_inspector()
 
     def toggle_mode(self): # toggle mode (play>editor, editor>play)
         if self.mode == "editor":
@@ -2413,8 +2458,6 @@ class VisualEditor(tk.Frame):
         ctrl = tk.Frame(self.play_window)
         ctrl.pack(fill=tk.X)
         tk.Button(ctrl, text="Restart", command=self.play_restart).pack(side=tk.LEFT)
-        #tk.Button(ctrl, text="Reset vars/inv", command=self.reset_state).pack(side=tk.LEFT)
-        #tk.Button(ctrl, text="Close Play", command=self.close_play).pack(side=tk.RIGHT)
         self.play_current = START_NODE
         self.play_path = []
         self.play_render_current()
