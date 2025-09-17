@@ -1,6 +1,6 @@
 """ 
 Branch, a CYOA (Choose-Your-Own-Adventure) Maker.
-Version: v0.5.02.14
+Version: v0.5.02.15
 
 ******************************************To-Do******************************************
 
@@ -16,8 +16,6 @@ Version: v0.5.02.14
 @4@ Option line template button (adds a template like, line1:'Template | 1 |  | ', or the next available 
     (not max+1, the min available) line due to the user might have some already written lines.)
 
-@5@ inline leaf comment support, in leaves you can add '#' at the start for that line to be ignored
-
 @6@ add a setting, 'disable text truncation'.
 
 @7@ add a setting, 'pan speed'.
@@ -28,6 +26,9 @@ Version: v0.5.02.14
 ********************************************************************************************
 
 Changelog:
+@ v0.5.02.15 -
+    * Added Comments to Leaves (mentioned in the Leaves Documentation)
+
 @ v0.5.02.14 -
     * Added Underground, Sky, Night Sky, Lemon & 90s Theme.
     * Added 2 other forms of "if"s (mentioned in the Leaves Documentation)
@@ -155,7 +156,7 @@ def parse_option_line(line: Union[str, Dict]) -> Optional[Dict]:
         return None  # invalid input
 
     raw = line.strip()
-    if not raw:
+    if not raw or raw.startswith("#"):
         return None
 
     # instant leaf (starts with @) → no text/next/cond, only actions
@@ -1933,13 +1934,22 @@ class VisualEditor(tk.Frame):
         if self.selected_node is None:
             #messagebox.showinfo("No node", "Select a node first.")
             return
+        
+        if self.selected_node not in nodes:
+            return
+
         header = self.header_text.get("1.0", tk.END).strip()
-        opts_raw = self.options_text.get("1.0", tk.END).strip().splitlines()
+        opts_text = self.options_text.get("1.0", tk.END).strip()
+        
+        nodes[self.selected_node]["raw_options"] = opts_text # Store raw text to preserve comments
+
+        opts_raw = opts_text.splitlines()
         opts = []
         for line in opts_raw:
             parsed = parse_option_line(line)
             if parsed:
                 opts.append(parsed)
+
         nodes[self.selected_node]["header"] = header
         nodes[self.selected_node]["options"] = opts
         self.redraw()
@@ -2540,8 +2550,12 @@ class VisualEditor(tk.Frame):
         self.id_label.config(text=f"ID: {self.selected_node}")
         self.header_text.delete("1.0", tk.END); self.header_text.insert(tk.END, data.get("header",""))
         self.options_text.delete("1.0", tk.END)
-        for opt in data.get("options",[]):
-            self.options_text.insert(tk.END, format_option_line(opt) + "\n")
+        # If raw_options exists, use it to preserve comments. Otherwise, format from parsed options.
+        if "raw_options" in data:
+            self.options_text.insert(tk.END, data.get("raw_options", ""))
+        else:
+            for opt in data.get("options",[]):
+                self.options_text.insert(tk.END, format_option_line(opt) + "\n")
         
         self.vars_list.delete("1.0", tk.END)
         for k,v in vars_store.items():
