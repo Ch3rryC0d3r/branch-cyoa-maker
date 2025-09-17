@@ -51,6 +51,17 @@
   <pre><code>Take the sword | 5 | has_item:Key | add_item:Sword</code></pre>
 </div>
 
+<h2>Comments</h2>
+<p>You can add comments to your Leaf options to leave notes for yourself or to temporarily disable a line. The game engine will ignore any line that starts with a hash symbol (<code>#</code>).</p>
+<div class="example">
+  <p><strong>Example with comments:</strong></p>
+  <pre><code># This is a choice to go left.
+Go left | 2 | | 
+Go right | 3 | | 
+# TODO: Add a condition for this secret path later
+# A secret path | 4 | has_item:key | </code></pre>
+</div>
+
 <h2>Conditions</h2>
 <p>Conditions control whether a Leaf is visible to the player. You can chain multiple conditions together using <code>&</code> or <code>;</code>. All conditions must be true for the Leaf to appear.</p>
 <ul>
@@ -133,7 +144,7 @@
 
 </main>
 <footer>
-  <p>Last updated for Branch v0.5.02.14</p>
+  <p>Last updated for Branch v0.5.02.15</p>
 </footer>
 </body>
 </html>
