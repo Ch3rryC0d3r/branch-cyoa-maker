@@ -1,6 +1,6 @@
 """ 
 Branch, a CYOA (Choose-Your-Own-Adventure) Maker.
-Version: v0.5.02.15
+Version: v0.5.04.17
 
 ******************************************To-Do******************************************
 
@@ -26,6 +26,16 @@ Version: v0.5.02.15
 ********************************************************************************************
 
 Changelog:
+@ v0.5.04.17 -
+    * Enhanced error syntax highlighting
+
+@ v0.5.04.16 -
+    * Added syntax highlighting to the 'Options' text box in the Node Inspector.
+    * Keywords, comments, variables, strings, and numbers are now colored.
+    * Unknown action keywords are highlighted in red to help spot typos.
+    * Cleaned up theme files to fix issues with syntax color loading.
+    * Fixed a bug where unsaved text in the inspector could be lost when changing selection.
+
 @ v0.5.02.15 -
     * Added Comments to Leaves (mentioned in the Leaves Documentation)
 
@@ -601,6 +611,7 @@ class VisualEditor(tk.Frame):
         self.multi_select_rect = None
         self.multi_selected_nodes = set() # set of multi selected nodes
         self.undo_stack = [] # undo stack, or 'undo list'
+        self._highlight_job = None # For debouncing syntax highlighting
         self.theme = {} # define 'self.theme' for later use
 
         # --- comment system state ---
@@ -809,9 +820,12 @@ class VisualEditor(tk.Frame):
 
         # Auto-application stuff
         self.updating = False
-        for t in (self.header_text, self.options_text, self.vars_list):
-            t.bind("<<Modified>>", self._on_modified)
-            t.bind("<FocusOut>", self._on_focus_out)
+        self.header_text.bind("<<Modified>>", self._on_modified)
+        self.vars_list.bind("<<Modified>>", self._on_modified)
+
+        self.header_text.bind("<FocusOut>", self._on_focus_out)
+        self.options_text.bind("<FocusOut>", self._on_focus_out)
+        self.vars_list.bind("<FocusOut>", self._on_focus_out)
 
         # Background Right Click Menu
         self.bg_menu = tk.Menu(self.canvas, tearoff=0)
@@ -830,6 +844,9 @@ class VisualEditor(tk.Frame):
             self.themepreset('default')
         else:
             self.load_theme()
+
+        # Configure syntax highlighting
+        self._configure_syntax_highlighting()
 
         # Build an example
         self.build_example()
@@ -885,11 +902,13 @@ class VisualEditor(tk.Frame):
             return
         w = event.widget
         if w.edit_modified():
-            if self.selected_comment is not None:
-                self.apply_comment_edits()
-            elif self.selected_node is not None:
-                self.apply_edits()
-            self.apply_vars_text()  # always apply vars if needed
+            if w is self.header_text:
+                if self.selected_comment is not None:
+                    self.apply_comment_edits()
+                elif self.selected_node is not None:
+                    self.apply_edits()
+            elif w is self.vars_list:
+                self.apply_vars_text()
             w.edit_modified(False)
 
     def _on_focus_out(self, event):
@@ -935,6 +954,15 @@ class VisualEditor(tk.Frame):
                     "inspector_textbox_bg": "#f5f5f5",
                     "inspector_button_bg": "#a6e3a1",
 
+                    "syntax_keyword": "#c586c0", # magenta
+                    "syntax_comment": "#6A9955",
+                    "syntax_string": "#ce9178",
+                    "syntax_number": "#b5cea8",
+                    "syntax_variable": "#9cdcfe",
+                    "syntax_separator": "#888888",
+                    "syntax_operator": "#888888",
+                    "syntax_error": "#f44747",
+
                     "preset_canvas_bg": "#ffffff",
                     "preset_inner_bg": "#ffffff",
                     "preset_frame_bg": "#ffffff",
@@ -964,6 +992,15 @@ class VisualEditor(tk.Frame):
                     "inspector_toggle_btn": "#704348",
                     "inspector_textbox_bg": "#f5f5f5",
                     "inspector_button_bg": "#f38ba8",
+
+                    "syntax_keyword": "#f38ba8", # red
+                    "syntax_comment": "#7f849c",
+                    "syntax_string": "#fab387",
+                    "syntax_number": "#a6e3a1",
+                    "syntax_variable": "#89b4fa",
+                    "syntax_separator": "#888888",
+                    "syntax_operator": "#888888",
+                    "syntax_error": "#f38ba8",
 
                     "preset_canvas_bg": "#ffffff",
                     "preset_inner_bg": "#ffffff",
@@ -995,6 +1032,15 @@ class VisualEditor(tk.Frame):
                     "inspector_textbox_bg": "#f5f5f5",
                     "inspector_button_bg": "#89b4fa",
 
+                    "syntax_keyword": "#cba6f7", # lavender
+                    "syntax_comment": "#7f849c",
+                    "syntax_string": "#fab387",
+                    "syntax_number": "#a6e3a1",
+                    "syntax_variable": "#89b4fa",
+                    "syntax_separator": "#888888",
+                    "syntax_operator": "#888888",
+                    "syntax_error": "#f38ba8",
+
                     "preset_canvas_bg": "#ffffff",
                     "preset_inner_bg": "#ffffff",
                     "preset_frame_bg": "#ffffff",
@@ -1024,6 +1070,15 @@ class VisualEditor(tk.Frame):
                     "inspector_toggle_btn": "#4a6b51",
                     "inspector_textbox_bg": "#f5f5f5",
                     "inspector_button_bg": "#a6e3a1",
+
+                    "syntax_keyword": "#dfa00d", # dark yellow
+                    "syntax_comment": "#7f849c",
+                    "syntax_string": "#fab387",
+                    "syntax_number": "#a6e3a1",
+                    "syntax_variable": "#89b4fa",
+                    "syntax_separator": "#888888",
+                    "syntax_operator": "#888888",
+                    "syntax_error": "#f38ba8",
 
                     "preset_canvas_bg": "#ffffff",
                     "preset_inner_bg": "#ffffff",
@@ -1055,6 +1110,15 @@ class VisualEditor(tk.Frame):
                     "inspector_textbox_bg": "#f5f5f5",
                     "inspector_button_bg": "#cba6f7",
 
+                    "syntax_keyword": "#cba6f7", # lavender
+                    "syntax_comment": "#7f849c",
+                    "syntax_string": "#fab387",
+                    "syntax_number": "#a6e3a1",
+                    "syntax_variable": "#89b4fa",
+                    "syntax_separator": "#888888",
+                    "syntax_operator": "#888888",
+                    "syntax_error": "#f38ba8",
+
                     "preset_canvas_bg": "#ffffff",
                     "preset_inner_bg": "#ffffff",
                     "preset_frame_bg": "#ffffff",
@@ -1084,6 +1148,15 @@ class VisualEditor(tk.Frame):
                     "inspector_toggle_btn": "#714e6f",
                     "inspector_textbox_bg": "#f5f5f5",
                     "inspector_button_bg": "#f7a6e4",
+
+                    "syntax_keyword": "#f7a6e4", # pink
+                    "syntax_comment": "#7f849c",
+                    "syntax_string": "#fab387",
+                    "syntax_number": "#a6e3a1",
+                    "syntax_variable": "#89b4fa",
+                    "syntax_separator": "#888888",
+                    "syntax_operator": "#888888",
+                    "syntax_error": "#f38ba8",
 
                     "preset_canvas_bg": "#ffffff",
                     "preset_inner_bg": "#ffffff",
@@ -1115,6 +1188,15 @@ class VisualEditor(tk.Frame):
                     "inspector_textbox_bg": "#f5f5f5",
                     "inspector_button_bg": "#cd853f",
 
+                    "syntax_keyword": "#cd853f", # peru
+                    "syntax_comment": "#928374",
+                    "syntax_string": "#d65d0e",
+                    "syntax_number": "#b5cea8",
+                    "syntax_variable": "#83a598",
+                    "syntax_separator": "#7c6f64",
+                    "syntax_operator": "#7c6f64",
+                    "syntax_error": "#fb4934",
+
                     "preset_canvas_bg": "#ffffff",
                     "preset_inner_bg": "#ffffff",
                     "preset_frame_bg": "#ffffff",
@@ -1144,6 +1226,15 @@ class VisualEditor(tk.Frame):
                     "inspector_toggle_btn": "#90c8f8",
                     "inspector_textbox_bg": "#ffffff",
                     "inspector_button_bg": "#ffdb58",
+
+                    "syntax_keyword": "#4682b4", # steelblue
+                    "syntax_comment": "#3b82f6",
+                    "syntax_string": "#fb923c",
+                    "syntax_number": "#34d399",
+                    "syntax_variable": "#2563eb",
+                    "syntax_separator": "#6b7280", # grey
+                    "syntax_operator": "#6b7280", # grey
+                    "syntax_error": "#ef4444",
 
                     "preset_canvas_bg": "#ffffff",
                     "preset_inner_bg": "#ffffff",
@@ -1175,6 +1266,15 @@ class VisualEditor(tk.Frame):
                     "inspector_textbox_bg": "#f8fafc",
                     "inspector_button_bg": "#93c5fd",
 
+                    "syntax_keyword": "#60a5fa",
+                    "syntax_comment": "#64748b",
+                    "syntax_string": "#f59e0b",
+                    "syntax_number": "#34d399",
+                    "syntax_variable": "#818cf8",
+                    "syntax_separator": "#94a3b8",
+                    "syntax_operator": "#94a3b8",
+                    "syntax_error": "#f87171",
+
                     "preset_canvas_bg": "#ffffff",
                     "preset_inner_bg": "#ffffff",
                     "preset_frame_bg": "#ffffff",
@@ -1204,6 +1304,15 @@ class VisualEditor(tk.Frame):
                     "inspector_toggle_btn": "#fde68a",
                     "inspector_textbox_bg": "#ffffff",
                     "inspector_button_bg": "#a3e635",
+
+                    "syntax_keyword": "#f97316", # orange
+                    "syntax_comment": "#ca8a04",
+                    "syntax_string": "#2563eb",
+                    "syntax_number": "#16a34a",
+                    "syntax_variable": "#4f46e5",
+                    "syntax_separator": "#44403c",
+                    "syntax_operator": "#44403c",
+                    "syntax_error": "#dc2626",
 
                     "preset_canvas_bg": "#ffffff",
                     "preset_inner_bg": "#ffffff",
@@ -1235,6 +1344,15 @@ class VisualEditor(tk.Frame):
                     "inspector_textbox_bg": "#cccccc",
                     "inspector_button_bg": "#444444",
                     "inspector_text_fg": "#000000",
+
+                    "syntax_keyword": "#222222",
+                    "syntax_comment": "#666666",
+                    "syntax_string": "#333333",
+                    "syntax_number": "#333333",
+                    "syntax_variable": "#333333",
+                    "syntax_separator": "#555555",
+                    "syntax_operator": "#555555",
+                    "syntax_error": "#000000",
 
                     "preset_canvas_bg": "#333333",
                     "preset_inner_bg": "#333333",
@@ -1285,6 +1403,8 @@ class VisualEditor(tk.Frame):
             apply_theme_recursive(self.inspector)
             if self.settings['change_node_colors']:
                 self.change_every_node_color(self.theme.get('default_node_color', '#222222'))
+            
+            self._configure_syntax_highlighting() # Re-apply tag colors
 
         except Exception:
             pass
@@ -1397,6 +1517,136 @@ class VisualEditor(tk.Frame):
 
             tk.Button(keybind_frame, text="Apply", command=save_bind).grid(row=i, column=2, sticky='e', padx=4, pady=2)
                 
+    def is_valid_action(self, s: str) -> bool:
+        """Checks if a single action string is syntactically valid."""
+        s = s.strip()
+        if not s: return True
+
+        # Check against known action patterns
+        if re.match(r"^if\(", s): return True
+        if s.startswith("chance(") and s.endswith(")"): return True
+        if s.startswith("weighted(") and s.endswith(")"): return True
+        if s.startswith("randr(") and s.endswith(")"): return True
+        if s.startswith("rands(") and s.endswith(")"): return True
+        if s == "clearinv": return True
+        # Assignment: var=... var+=...
+        if re.match(r"^[A-Za-z_][A-Za-z0-9_]*\s*([\+\-\*/]?=)", s): return True
+        
+        # Check for keyword:value patterns
+        m = self.error_pattern.match(s)
+        if m:
+            keyword = m.group(1)
+            # Only certain keywords are valid as top-level actions
+            return keyword in {'add_item', 'remove_item', 'goto', 'once', 'repeat', 'set'}
+        
+        return False
+
+    def highlight_line_errors(self, line: str, line_num: int):
+        """Applies 'syntax_error' tags to a line for various errors."""
+        stripped_line = line.strip()
+        if not stripped_line or stripped_line.startswith('#'):
+            return
+
+        # --- Check 1: Too many pipe separators ---
+        if line.count('|') > 3:
+            self.options_text.tag_add("syntax_error", f"{line_num}.0", f"{line_num}.{len(line)}")
+            return
+
+        # --- Check 2: Unbalanced brackets/parentheses ---
+        stack = []
+        pairs = {'(': ')', '[': ']', '{': '}'}
+        for idx, char in enumerate(line):
+            if char in pairs:
+                stack.append((char, idx))
+            elif char in pairs.values():
+                if not stack or pairs[stack.pop()[0]] != char:
+                    self.options_text.tag_add("syntax_error", f"{line_num}.{idx}", f"{line_num}.{idx+1}")
+        for _, idx in stack: # Highlight unclosed opening brackets
+            self.options_text.tag_add("syntax_error", f"{line_num}.{idx}", f"{line_num}.{idx+1}")
+
+        # --- Check 3: Invalid actions in the action part ---
+        parts = line.split('|')
+        if len(parts) > 3:
+            actions_string = parts[3]
+            pipe_indices = [i for i, char in enumerate(line) if char == '|']
+            if len(pipe_indices) >= 3:
+                actions_start_index = pipe_indices[2] + 1
+                for match in re.finditer(r'[^;&]+', actions_string):
+                    action = match.group(0).strip()
+                    if not action: continue
+                    
+                    if not self.is_valid_action(action):
+                        start, end = match.span()
+                        self.options_text.tag_add("syntax_error", f"{line_num}.{actions_start_index + start}", f"{line_num}.{actions_start_index + end}")
+
+    def _configure_syntax_highlighting(self):
+        self.syntax_tags = [
+            "syntax_keyword", "syntax_comment", "syntax_string", "syntax_number",
+            "syntax_variable", "syntax_separator", "syntax_operator", "syntax_error"
+        ]
+        
+        # Define colors for tags from theme
+        self.options_text.tag_configure("syntax_keyword", foreground=self.theme.get("syntax_keyword", "#c586c0"))
+        self.options_text.tag_configure("syntax_comment", foreground=self.theme.get("syntax_comment", "#6A9955"))
+        self.options_text.tag_configure("syntax_string", foreground=self.theme.get("syntax_string", "#ce9178"))
+        self.options_text.tag_configure("syntax_number", foreground=self.theme.get("syntax_number", "#b5cea8"))
+        self.options_text.tag_configure("syntax_variable", foreground=self.theme.get("syntax_variable", "#9cdcfe"))
+        self.options_text.tag_configure("syntax_separator", foreground=self.theme.get("syntax_separator", "#d4d4d4"))
+        self.options_text.tag_configure("syntax_operator", foreground=self.theme.get("syntax_operator", "#d4d4d4"))
+        self.options_text.tag_configure("syntax_error", foreground=self.theme.get("syntax_error", "#f44747"), underline=True)
+        
+        self.known_keywords = {
+            'if', 'once', 'repeat', 'chance', 'weighted', 'randr', 'rands', 'goto',
+            'add_item', 'remove_item', 'clearinv', 'set', 'not_has_item', 'has_item'
+        }
+        
+        # Patterns for highlighting. Order matters.
+        self.highlight_patterns = [
+            ("syntax_comment", re.compile(r'#.*')),
+            ("syntax_variable", re.compile(r'\{[A-Za-z_][A-Za-z0-9_]*\}')),
+            ("syntax_string", recompile(r'"[^"]*"|\'[^\']*\'')),
+            ("syntax_keyword", re.compile(r'\b(' + '|'.join(self.known_keywords) + r')\b')),
+            ("syntax_number", re.compile(r'\b-?\d+(\.\d+)?\b')),
+            ("syntax_separator", re.compile(r'\||>>?|[:&;]')),
+            ("syntax_operator", re.compile(r'[\+\-\*/]?=')),
+        ]
+        
+        self.error_pattern = re.compile(r'\b([a-zA-Z_]+)(?=:)\b')
+        self.known_action_prefixes = {'add_item', 'remove_item', 'goto', 'once', 'repeat', 'set', 'var', 'has_item', 'not_has_item', 'weighted', 'randr', 'rands'}
+
+        # Bind events
+        self.options_text.bind("<<Modified>>", self._schedule_highlight, add="+")
+
+    def _schedule_highlight(self, event=None):
+        if self.updating:
+            self.options_text.edit_modified(False)
+            return
+
+        # Only proceed if the widget was actually modified.
+        if self.options_text.edit_modified():
+            # Reset the flag so we can catch the next modification.
+            self.options_text.edit_modified(False)
+            
+            # Debounce the actual highlighting work.
+            if self._highlight_job:
+                self.after_cancel(self._highlight_job)
+            self._highlight_job = self.after(150, self._highlight_syntax)
+
+    def _highlight_syntax(self):
+        if not self.options_text.winfo_exists(): return
+        self._highlight_job = None
+        
+        for tag in self.syntax_tags:
+            self.options_text.tag_remove(tag, "1.0", "end")
+
+        for i, line in enumerate(self.options_text.get("1.0", "end-1c").splitlines()):
+            line_num = i + 1
+            for tag, pattern in self.highlight_patterns:
+                for match in pattern.finditer(line):
+                    start, end = match.span()
+                    self.options_text.tag_add(tag, f"{line_num}.{start}", f"{line_num}.{end}")
+            self.highlight_line_errors(line, line_num)
+
     def open_themecontrol(self):
         self.win = tk.Toplevel(self)
         self.win.title("Theme")
@@ -1457,6 +1707,7 @@ class VisualEditor(tk.Frame):
         #self.settings["disable_zooming"] = self.disable_zooming.get() 
 
     def add_node_prompt(self):
+        self._apply_pending_inspector_edits()
         w, h = self.canvas.winfo_width(), self.canvas.winfo_height()
         x, y = self.canvas.canvasx(w / 2), self.canvas.canvasy(h / 2)        
         nid = simpledialog.askinteger("Add Node", "Node ID (int):", minvalue=1)
@@ -1599,6 +1850,7 @@ class VisualEditor(tk.Frame):
         self.canvas.yview_moveto(frac_y)
 
     def search_node(self, event=None):
+        self._apply_pending_inspector_edits()
         nid_str = self.search_var.get().strip()
         if not nid_str.isdigit():
             return
@@ -1823,6 +2075,7 @@ class VisualEditor(tk.Frame):
             print("Failed to save settings:", e)
 
     def duplicate_multi_nodes(self): # duplicate multiple nodes at once, happens when you're multi-selecting
+        self._apply_pending_inspector_edits()
         targets = self.multi_selected_nodes if self.multi_selected_nodes else {self.selected_node}
         new_ids = []
         for nid in targets:
@@ -1929,10 +2182,18 @@ class VisualEditor(tk.Frame):
         if self.selected_node is not None:
             START_NODE = self.selected_node
             #messagebox.showinfo("Start node", f"Start node set to {START_NODE}")
+    
+    def _apply_pending_inspector_edits(self):
+        """Saves any text currently in the inspector to the selected object without redrawing."""
+        if self.updating: return
+        
+        if self.selected_node is not None:
+            self.apply_edits(redraw_canvas=False)
+        elif self.selected_comment is not None:
+            self.apply_comment_edits(redraw_canvas=False)
 
-    def apply_edits(self): # apply edits for options_text and header_text
+    def apply_edits(self, redraw_canvas=True): # apply edits for options_text and header_text
         if self.selected_node is None:
-            #messagebox.showinfo("No node", "Select a node first.")
             return
         
         if self.selected_node not in nodes:
@@ -1952,7 +2213,8 @@ class VisualEditor(tk.Frame):
 
         nodes[self.selected_node]["header"] = header
         nodes[self.selected_node]["options"] = opts
-        self.redraw()
+        if redraw_canvas:
+            self.redraw()
 
     def apply_vars_text(self): # apply edits for vars_list
         raw = self.vars_list.get("1.0", tk.END).strip().splitlines()
@@ -1984,6 +2246,7 @@ class VisualEditor(tk.Frame):
         #messagebox.showinfo("Vars", "Vars & inventory applied.")
 
     def quick_add_node(self, event=None, x=None, y=None):  
+        self._apply_pending_inspector_edits()
         self.push_undo()
 
         # Find the lowest available node ID
@@ -2293,10 +2556,11 @@ class VisualEditor(tk.Frame):
         self.header_text.delete("1.0", tk.END)
         self.header_text.insert(tk.END, comment["text"])
 
-    def apply_comment_edits(self): # apply comment edits to the comment
+    def apply_comment_edits(self, redraw_canvas=True): # apply comment edits to the comment
         if self.selected_comment is None: return
         comments[self.selected_comment]["text"] = self.header_text.get("1.0", tk.END).strip()
-        self.redraw()
+        if redraw_canvas:
+            self.redraw()
 
     def get_node_at(self, x, y): # gets node at (usually at mouse)
         scale = self.current_zoom
@@ -2373,6 +2637,7 @@ class VisualEditor(tk.Frame):
         self.resize_dir = None
 
     def canvas_mouse_down(self, event): # called on mouse_down
+        self._apply_pending_inspector_edits()
         cx, cy = self.canvas.canvasx(event.x), self.canvas.canvasy(event.y)
         clicked_node = self.get_node_at(cx, cy)
 
@@ -2557,6 +2822,8 @@ class VisualEditor(tk.Frame):
             for opt in data.get("options",[]):
                 self.options_text.insert(tk.END, format_option_line(opt) + "\n")
         
+        self._schedule_highlight()
+        
         self.vars_list.delete("1.0", tk.END)
         for k,v in vars_store.items():
             self.vars_list.insert(tk.END, f"{k}={v}\n")
@@ -2568,6 +2835,7 @@ class VisualEditor(tk.Frame):
         self.id_label.config(text="ID: -")
         self.header_text.delete("1.0", tk.END)
         self.options_text.delete("1.0", tk.END)
+        self._schedule_highlight()
         if keepVarsList == False:
             self.vars_list.delete("1.0", tk.END)
 
@@ -2776,6 +3044,10 @@ class VisualEditor(tk.Frame):
         vars_store["mysterious_path"] = 7
         self.update_node_count()
         self.redraw()
+
+def recompile(pattern):
+    """Helper to silence potential re.Pattern type errors in older linters."""
+    return re.compile(pattern)
 
 def main(): # main
     root = tk.Tk()
