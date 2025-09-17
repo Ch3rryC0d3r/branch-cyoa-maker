@@ -1,6 +1,6 @@
 """ 
 Branch, a CYOA (Choose-Your-Own-Adventure) Maker.
-Version: v0.5.04.17
+Version: v0.5.05
 
 ******************************************To-Do******************************************
 
@@ -21,11 +21,12 @@ Version: v0.5.04.17
 @7@ add a setting, 'pan speed'.
 
 @8@ make it where you can't move nodes while you're panning, I think you can as of now.
-
-@9@ truncate_text_to_fit() works if you return lines, however, it does not when you don't return at all, like in 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' for example.
 ********************************************************************************************
 
 Changelog:
+@ v0.5.05 - [removed 4th number for simplicity in version labels]
+    * Fixed text truncation.
+
 @ v0.5.04.17 -
     * Enhanced error syntax highlighting
 
@@ -36,20 +37,7 @@ Changelog:
     * Cleaned up theme files to fix issues with syntax color loading.
     * Fixed a bug where unsaved text in the inspector could be lost when changing selection.
 
-@ v0.5.02.15 -
-    * Added Comments to Leaves (mentioned in the Leaves Documentation)
-
-@ v0.5.02.14 -
-    * Added Underground, Sky, Night Sky, Lemon & 90s Theme.
-    * Added 2 other forms of "if"s (mentioned in the Leaves Documentation)
-
-@ v0.5.02.13 - 
-    * Fixed if(...)> parsing so only the first action is executed by default.
-    * Added >> operator for if(...)>>ACTION to execute all actions after it as a single block.
-    * Ensures multi-action statements like if(gold>=price)>>potions+=1;gold-=price;price*=2 now work as expected.
-    * Improved consistency for conditional and repeatable actions parsing.
-    
-...truncated changelog due to length...
+...
 """
 
 # built-ins
@@ -2284,58 +2272,90 @@ class VisualEditor(tk.Frame):
         self.update_node_count()
 
     def truncate_text_to_fit(self, text, font, max_w, max_h):
-        linespace = font.metrics("linespace")
-        max_lines = max(1, max_h // max(1, linespace))
-        lines = []
-        truncated = False
-        if self.settings['disable_text_truncation'] == True:
+        if self.settings.get('disable_text_truncation', False):
             return text
-        for user_line in text.split('\n'):
-            if len(lines) >= max_lines:
+
+        linespace = font.metrics("linespace")
+        max_lines = max(1, int(max_h / linespace))
+        
+        final_lines = []
+        truncated = False
+
+        paragraphs = text.split('\n')
+        for paragraph in paragraphs:
+            if len(final_lines) >= max_lines:
                 truncated = True
                 break
 
-            words = user_line.split(' ')
+            words = paragraph.split(' ')
             current_line = ""
+            
             for word in words:
+                if not word:
+                    continue
+
+                # If the word itself is too long, it must be broken down.
+                if font.measure(word) > max_w:
+                    # Finish the current line before dealing with the long word
+                    if current_line:
+                        if len(final_lines) < max_lines:
+                            final_lines.append(current_line)
+                        else:
+                            truncated = True; break
+                    current_line = "" # Reset for after the long word
+
+                    # Break the long word into fitting parts
+                    temp_word = word
+                    while temp_word:
+                        if len(final_lines) >= max_lines:
+                            truncated = True; break
+                        
+                        split_idx = len(temp_word)
+                        for i in range(1, len(temp_word) + 1):
+                            if font.measure(temp_word[:i]) > max_w:
+                                split_idx = i - 1
+                                break
+                        
+                        split_idx = max(1, split_idx)
+                        final_lines.append(temp_word[:split_idx])
+                        temp_word = temp_word[split_idx:]
+                    if truncated: break
+                    continue # The long word is fully processed, move to the next word
+
+                # Normal word wrapping
                 test_line = (current_line + " " + word).strip() if current_line else word
                 if font.measure(test_line) <= max_w:
                     current_line = test_line
                 else:
-                    if len(lines) < max_lines:
-                        lines.append(current_line)
+                    if len(final_lines) < max_lines:
+                        final_lines.append(current_line)
                         current_line = word
                     else:
-                        truncated = True
-                        break
+                        truncated = True; break
+            
+            if truncated: break
 
-            if not truncated:
-                if len(lines) < max_lines:
-                    lines.append(current_line)
+            # Add the last line of the paragraph
+            if current_line:
+                if len(final_lines) < max_lines:
+                    final_lines.append(current_line)
                 else:
                     truncated = True
-            
-            if truncated:
-                
-                break
 
-        if len(lines) > max_lines:
-            lines = lines[:max_lines]
+        # Final truncation and ellipsis logic
+        if len(final_lines) > max_lines:
+            final_lines = final_lines[:max_lines]
             truncated = True
         
-        if truncated and lines:
-            last_line = lines[-1]
-            # Ensure last line itself isn't too wide (it might be from a single long word)
-            while font.measure(last_line) > max_w and last_line:
-                last_line = last_line[:-1]
+        if truncated and final_lines:
+            last_line = final_lines[-1]
             
-            # Add ellipsis, making sure it fits
-            while font.measure(last_line + "...") > max_w and last_line:
-                last_line = last_line[:-1]
-            
-            lines[-1] = last_line + "..." if last_line else "..."
+            if not last_line.endswith("..."):
+                while font.measure(last_line + "...") > max_w and last_line:
+                    last_line = last_line[:-1]
+                final_lines[-1] = (last_line + "...") if last_line else "..."
 
-        return "\n".join(lines)
+        return "\n".join(final_lines)
 
     def clear_comment_handles(self, cid):
         data = comments.get(cid)
