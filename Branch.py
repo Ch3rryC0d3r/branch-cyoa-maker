@@ -2,7 +2,7 @@
 Branch, a CYOA (Choose-Your-Own-Adventure) Maker.
 Version: v0.5.02.14
 
-******************************************To Do******************************************
+******************************************To-Do******************************************
 
 @1@ Fix zooming and fully re-add it [zooming]. Calling 'redraw()' never drawed the nodes with sizes based on the 'current_zoom', 
     I've tried before, however, the node offset way too far (~ 1,-1) each time I tried to dragged a node.
@@ -16,20 +16,21 @@ Version: v0.5.02.14
 @4@ Option line template button (adds a template like, line1:'Template | 1 |  | ', or the next available 
     (not max+1, the min available) line due to the user might have some already written lines.)
 
-@6@ inline leaf comment support, in leaves you can add '#' at the start for that line to be ignored
+@5@ inline leaf comment support, in leaves you can add '#' at the start for that line to be ignored
 
-@7@ add a setting, 'disable text truncation'.
+@6@ add a setting, 'disable text truncation'.
 
-@8@ add a setting, 'pan speed'.
+@7@ add a setting, 'pan speed'.
 
-@9@ make it where you can't move nodes while you're panning, I think you can as of now.
+@8@ make it where you can't move nodes while you're panning, I think you can as of now.
 
-@10@ truncate_text_to_fit() works if you return lines, however, it does not when you don't return at all, like in 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' for example.
+@9@ truncate_text_to_fit() works if you return lines, however, it does not when you don't return at all, like in 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' for example.
 ********************************************************************************************
 
 Changelog:
 @ v0.5.02.14 -
     * Added Underground, Sky, Night Sky, Lemon & 90s Theme.
+    * Added 2 other forms of "if"s (mentioned in the Leaves Documentation)
 
 @ v0.5.02.13 - 
     * Fixed if(...)> parsing so only the first action is executed by default.
@@ -217,11 +218,12 @@ def execute_actions(actions: List[str]):
     for act in actions:
         if not act:
             continue
-
-        if act.startswith('if('):
-            subs = [s.strip() for s in re.split(r'[&;]', act) if s.strip()] ## for now do same as normally but make it where it's just one full action later instead of it being seperated.            
+        
+        # If the action is an 'if' statement, treat it as a single unit to handle complex actions.
+        # Otherwise, split into sub-actions.
+        if act.strip().startswith('if('):
+            subs = [act.strip()]
         else:
-            # split multiple actions by & or ;
             subs = [s.strip() for s in re.split(r'[&;]', act) if s.strip()]
 
         for sub in subs:
@@ -232,7 +234,18 @@ def execute_actions(actions: List[str]):
                     execute_actions([instant_act])
                     continue
 
+                # ------------------ if(COND):<CONDITIONAL>UNCONDITIONAL ------------------
+                m_new_if = re.match(r"^if\((.+?)\):<(.+?)>(.*)$", sub)
+                if m_new_if:
+                    cond_expr, conditional_expr, unconditional_expr = m_new_if.groups()
+                    if evaluate_condition(cond_expr.strip()):
+                        execute_actions([conditional_expr.strip()])
+                    if unconditional_expr.strip():
+                        execute_actions([unconditional_expr.strip()])
+                    continue
+
                 # ------------------ if(COND)>ACT or if(COND)>>ACTS ------------------
+                # This now correctly handles multi-step actions with '>>'
                 m_if = re.match(r"^if\((.+?)\)(>>?)(.+)$", sub)
                 if m_if:
                     cond_expr = m_if.group(1).strip()
