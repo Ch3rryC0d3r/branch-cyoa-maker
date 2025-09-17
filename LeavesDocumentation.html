@@ -10,6 +10,7 @@
   header h1 { margin: 0; font-size: 2.5rem; }
   main { max-width: 1000px; margin: 2rem auto; padding: 1rem 2rem; background: #fff; border-radius: 10px; box-shadow: 0 5px 20px rgba(0,0,0,0.08); }
   h2 { border-bottom: 3px solid #2575fc; padding-bottom: 0.5rem; margin-top: 2rem; color: #222; }
+  footer { text-align: center; margin-top: 2rem; color: #777; font-size: 0.9rem; }
   h3 { margin-top: 1.5rem; color: #444; }
   p { margin: 1rem 0; }
   code, pre { background: #f4f4f4; padding: 0.2rem 0.4rem; border-radius: 5px; font-family: Consolas, monospace; }
@@ -39,10 +40,10 @@
 <pre><code>Text | Next | Condition | Actions</code></pre>
 
 <ul>
-  <li><strong>Text</strong> → What player sees (supports <code>{var}</code> substitution).</li>
-  <li><strong>Next</strong> → Node to go to (single, random, or variable).</li>
-  <li><strong>Condition</strong> → Optional checks for visibility.</li>
-  <li><strong>Actions</strong> → Things that happen when chosen.</li>
+  <li><strong>Text</strong> → What the player sees (supports <code>{var}</code> substitution).</li>
+  <li><strong>Next</strong> → The Node ID to go to (can be a single ID, random from a list like <code>1/2/3</code>, or a variable).</li>
+  <li><strong>Condition</strong> → Optional checks that must be true for the Leaf to be visible.</li>
+  <li><strong>Actions</strong> → Things that happen when the player chooses this Leaf.</li>
 </ul>
 
 <div class="example">
@@ -51,74 +52,88 @@
 </div>
 
 <h2>Conditions</h2>
-<p>Conditions control visibility. Chain them with <code>&</code> or <code>;</code>.</p>
+<p>Conditions control whether a Leaf is visible to the player. You can chain multiple conditions together using <code>&</code> or <code>;</code>. All conditions must be true for the Leaf to appear.</p>
 <ul>
-  <li><code>has_item:Sword</code> → Requires item.</li>
-  <li><code>not_has_item:Key</code> → Requires absence of item.</li>
-  <li><code>HP &lt;= 0</code> → Numeric/boolean checks.</li>
-  <li><code>var:CLICKS==1</code> → Explicit variable check.</li>
+  <li><code>has_item:Sword</code> → Checks if the player has the "Sword" item.</li>
+  <li><code>not_has_item:Key</code> → Checks if the player does <strong>not</strong> have the "Key" item.</li>
+  <li><code>HP &lt;= 0</code> → Allows for complex mathematical and boolean checks using variables.</li>
+  <li><code>var:CLICKS==1</code> → An explicit way to check a variable's value (the <code>var:</code> prefix is optional).</li>
 </ul>
 
 <h2>Actions</h2>
-<p>Actions execute when a Leaf is chosen. Chain with <code>&</code> or <code>;</code>.</p>
+<p>Actions are commands that execute when a Leaf is chosen. You can chain multiple actions together using <code>&</code> or <code>;</code>.</p>
 
 <h3>Variables</h3>
 <ul>
-  <li><code>gold = 100</code> → Assign value.</li>
-  <li><code>gold += 5</code> → Modify (also <code>-=</code>, <code>*=</code>, <code>/=</code>).</li>
+  <li><code>gold = 100</code> → Assigns a value to a variable.</li>
+  <li><code>gold += 5</code> → Modifies a variable's value (also supports <code>-=</code>, <code>*=</code>, <code>/=</code>).</li>
 </ul>
 
 <h3>Inventory</h3>
 <ul>
-  <li><code>add_item:Sword</code> → Add item.</li>
-  <li><code>remove_item:Key</code> → Remove item.</li>
-  <li><code>clearinv</code> → Wipe entire inventory.</li>
+  <li><code>add_item:Sword</code> → Adds an item to the player's inventory.</li>
+  <li><code>remove_item:Key</code> → Removes an item from the player's inventory.</li>
+  <li><code>clearinv</code> → Wipes the entire inventory.</li>
 </ul>
 
 <h3>Flow Control</h3>
 <ul>
-  <li><code>goto:10</code> → Jump to node.</li>
-  <li><code>once:add_item:Map</code> → Run action only the first time (never again).</li>
+  <li><code>goto:10</code> → Immediately jumps the player to Node 10.</li>
+  <li><code>once:add_item:Map</code> → This action will only run the very first time it's encountered. Any subsequent attempts to run this exact action will be ignored.</li>
 </ul>
 
 <h3>Randomization</h3>
 <ul>
-  <li><code>randr(damage:5,20)</code> → Random float in range.</li>
-  <li><code>rands(weather:Sunny,Cloudy)</code> → Random from list.</li>
-  <li><code>weighted(weather, Sunny=70, Rain=30)</code> → Weighted random choice.</li>
-  <li><code>change(30)&gt;gold+=10&gt;gold-=5</code> → 30% chance → success action, else → fail action.</li>
+  <li><code>randr(damage:5,20)</code> → Sets the 'damage' variable to a random number between 5 and 20.</li>
+  <li><code>rands(weather:Sunny,Cloudy)</code> → Sets the 'weather' variable to either "Sunny" or "Cloudy".</li>
+  <li><code>weighted(weather:Sunny=70,Rain=30)</code> → Sets 'weather' based on weights. "Sunny" has a 70% chance, "Rain" has a 30% chance.</li>
+  <li><code>chance(30)&gt;gold+=10</code> → A 30% chance to execute the success action (<code>gold+=10</code>).</li>
+  <li><code>chance(30)&gt;gold+=10&gt;gold-=5</code> → A 30% chance for success (<code>gold+=10</code>), otherwise the fail action (<code>gold-=5</code>) is executed.</li>
 </ul>
 
 <h3>Loops</h3>
 <ul>
-  <li><code>repeat:3&gt;gold+=1</code> → Repeat action N times.</li>
-</ul>
-
-<h3>Sound (requires <code>pygame</code>)</h3>
-<ul>
-  <li><code>play:coin.wav</code> → Play once, non-blocking.</li>
+  <li><code>repeat:3&gt;gold+=1</code> → Repeats the action (<code>gold+=1</code>) 3 times. The number can be a variable.</li>
 </ul>
 
 <h3>Instant Actions (@)</h3>
-<p>Run on node entry, before choice.</p>
+<p>Instant actions are special actions that run automatically when a player enters a node, <em>before</em> they get to make a choice. They are defined on their own line, starting with <code>@</code>.</p>
 <pre><code>@HP-=5
-@add_item:Key</code></pre>
+@if(is_cursed)&gt;add_item:Curse</code></pre>
 
-<h3>Conditional Actions</h3>
-<pre><code>if(HP&lt;=0)&gt;goto:GameOver
-if(has_item:Sword)&gt;gold+=50</code></pre>
+<h2>Conditional Actions (if)</h2>
+<p>The <code>if</code> statement is a powerful action that lets you run other actions only if a certain condition is met. It has a few different forms.</p>
 
+<h3>1. Single Conditional Action (&gt;)</h3>
+<p>This is the simplest form. If the condition is true, it executes only the <strong>first</strong> action that follows the <code>&gt;</code>.</p>
 <div class="example">
-  <p><strong>Complex Example:</strong></p>
-  <pre><code>Fight the dragon | 20 | var:LEVEL&gt;=5 &amp; has_item:Sword | 
-@HP-=20; randr(Damage:5,15); weighted(Loot, Gold=70, Gem=20, Nothing=10); 
-once:add_item:Trophy; play:roar.wav; change(30)&gt;goto:Victory&gt;goto:Defeat</code></pre>
+  <pre><code>if(has_item:Sword)&gt;damage+=10;cost=50</code></pre>
+  <p>In this case, if the player has a sword, <code>damage</code> will increase by 10. The <code>cost=50</code> action is <strong>not</strong> part of the if-statement and will always run.</p>
 </div>
 
-<h2>Summary</h2>
-<p>Leaves are the heart of Branch stories. Use text, conditions, actions, instant triggers, sound, randomization, and flow control to craft dynamic CYOA adventures.</p>
+<h3>2. Multi-Action Block (&gt;&gt;)</h3>
+<p>By using <code>&gt;&gt;</code>, you can tell the if-statement to treat <strong>all</strong> subsequent actions on the line as a single conditional block.</p>
+<div class="example">
+  <pre><code>if(gold&gt;=price)&gt;&gt;potions+=1;gold-=price</code></pre>
+  <p>Here, if <code>gold</code> is greater than or equal to <code>price</code>, <strong>both</strong> actions (<code>potions+=1</code> and <code>gold-=price</code>) will be executed.</p>
+</div>
+
+<h3>3. Advanced Conditional/Unconditional Block (&lt;...&gt;)</h3>
+<p>This is the most flexible syntax. It allows you to define a block of actions that run if the condition is true, followed by actions that run regardless.</p>
+<pre><code>if(condition):&lt;conditional_actions&gt;unconditional_actions</code></pre>
+<div class="example">
+  <pre><code>if(gold&gt;=price):&lt;potions+=1;gold-=price&gt;price*=2</code></pre>
+  <p>Let's break it down:</p>
+  <ul>
+    <li><strong>Condition:</strong> <code>gold&gt;=price</code></li>
+    <li><strong>Conditional Actions:</strong> <code>potions+=1;gold-=price</code> (inside the <code>&lt;...&gt;</code>) will only run if the condition is true.</li>
+    <li><strong>Unconditional Action:</strong> <code>price*=2</code> (after the <code>&lt;...&gt;</code>) will <strong>always</strong> run, no matter what the condition was.</li>
+  </ul>
+</div>
 
 </main>
+<footer>
+  <p>Last updated for Branch v0.5.02.14</p>
+</footer>
 </body>
-<p>Last update: Branch v0.5.02.10</p>
 </html>
