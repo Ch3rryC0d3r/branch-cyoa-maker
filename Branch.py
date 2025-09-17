@@ -1,6 +1,6 @@
 """ 
 Branch, a CYOA (Choose-Your-Own-Adventure) Maker.
-Version: v0.5.02.13
+Version: v0.5.02.14
 
 ******************************************To Do******************************************
 
@@ -16,13 +16,6 @@ Version: v0.5.02.13
 @4@ Option line template button (adds a template like, line1:'Template | 1 |  | ', or the next available 
     (not max+1, the min available) line due to the user might have some already written lines.)
 
-@5@ Themes to add: 
-    1. Underground Theme (brown/cave-style, maybe nodes are 'lights' (like yellow I mean) and the background and whatnot is shades of brown or gray)
-    2. Sky Theme (nodes could be "clouds" and bg and the other stuff is the sky)
-    3. Night Sky Theme (same as sky but nodes are 'stars' and the background and other stuff is darker, like a dark mode theme of the 'Sky' theme)
-    4. Lemon Theme (soft yellow)
-    5. 80s (or was it the 90s?) Theme (all black/white)
-
 @6@ inline leaf comment support, in leaves you can add '#' at the start for that line to be ignored
 
 @7@ add a setting, 'disable text truncation'.
@@ -35,7 +28,10 @@ Version: v0.5.02.13
 ********************************************************************************************
 
 Changelog:
-v0.5.02.13 - 
+@ v0.5.02.14 -
+    * Added Underground, Sky, Night Sky, Lemon & 90s Theme.
+
+@ v0.5.02.13 - 
     * Fixed if(...)> parsing so only the first action is executed by default.
     * Added >> operator for if(...)>>ACTION to execute all actions after it as a single block.
     * Ensures multi-action statements like if(gold>=price)>>potions+=1;gold-=price;price*=2 now work as expected.
@@ -638,7 +634,7 @@ class VisualEditor(tk.Frame):
         self.node_count_label.pack(side=tk.RIGHT, padx=6)
 
         # default settings
-        self.settings = DEFAULT_SETTINGS
+        self.settings = DEFAULT_SETTINGS.copy()
         self.load_settings() # load settings if path settings.json exists
 
         tk.Button(self.toolbar, text="Settings", command=self.open_settings).pack(side=tk.LEFT) # settings button
@@ -1079,6 +1075,157 @@ class VisualEditor(tk.Frame):
                     "preset_inner_bg": "#ffffff",
                     "preset_frame_bg": "#ffffff",                    
                 }
+            elif preset == 'underground':
+                self.theme = {
+                    "canvas_background": "#292522",
+                    "from_lines": "#ffd700",
+                    "to_lines": "#cd853f",
+                    "randomEdgeFromColor": "#b87333",
+
+                    "default_node_color": "#4d4540",
+                    "node_outline": "#6b5f58",
+                    "node_selected_outline": "#ffd700",
+                    "multi_selected_outline": "#ffec8b",
+                    "node_text_fill": "#f5deb3",
+
+                    "inspector_bg": "#3d3530",
+                    "inspector_canvas_bg": "#3d3530",
+                    "title_lbl_bg": "#3d3530",
+                    "inspector_frame_bg": "#3d3530",
+                    "inspector_container": "#524841",
+                    "inspector_body": "#524841",
+                    "inspector_label_bg": "#524841",
+                    "inspector_label_bg2": "#61564f",
+                    "inspector_header": "#61564f",
+                    "inspector_toggle_btn": "#61564f",
+                    "inspector_textbox_bg": "#f5f5f5",
+                    "inspector_button_bg": "#cd853f",
+
+                    "preset_canvas_bg": "#ffffff",
+                    "preset_inner_bg": "#ffffff",
+                    "preset_frame_bg": "#ffffff",
+                }
+            elif preset == 'sky':
+                self.theme = {
+                    "canvas_background": "#a0d2eb",
+                    "from_lines": "#ffdb58",
+                    "to_lines": "#4682b4",
+                    "randomEdgeFromColor": "#ffa500",
+
+                    "default_node_color": "#f5f5f5",
+                    "node_outline": "#dcdcdc",
+                    "node_selected_outline": "#ffdb58",
+                    "multi_selected_outline": "#f0e68c",
+                    "node_text_fill": "#333333",
+
+                    "inspector_bg": "#e0f2fe",
+                    "inspector_canvas_bg": "#e0f2fe",
+                    "title_lbl_bg": "#e0f2fe",
+                    "inspector_frame_bg": "#e0f2fe",
+                    "inspector_container": "#bde0fe",
+                    "inspector_body": "#bde0fe",
+                    "inspector_label_bg": "#bde0fe",
+                    "inspector_label_bg2": "#90c8f8",
+                    "inspector_header": "#90c8f8",
+                    "inspector_toggle_btn": "#90c8f8",
+                    "inspector_textbox_bg": "#ffffff",
+                    "inspector_button_bg": "#ffdb58",
+
+                    "preset_canvas_bg": "#ffffff",
+                    "preset_inner_bg": "#ffffff",
+                    "preset_frame_bg": "#ffffff",
+                }
+            elif preset == 'night sky':
+                self.theme = {
+                    "canvas_background": "#0b1120",
+                    "from_lines": "#fde047",
+                    "to_lines": "#93c5fd",
+                    "randomEdgeFromColor": "#a5b4fc",
+
+                    "default_node_color": "#1e293b",
+                    "node_outline": "#475569",
+                    "node_selected_outline": "#fde047",
+                    "multi_selected_outline": "#f8fafc",
+                    "node_text_fill": "#e2e8f0",
+
+                    "inspector_bg": "#1c2436",
+                    "inspector_canvas_bg": "#1c2436",
+                    "title_lbl_bg": "#1c2436",
+                    "inspector_frame_bg": "#1c2436",
+                    "inspector_container": "#2a364e",
+                    "inspector_body": "#2a364e",
+                    "inspector_label_bg": "#2a364e",
+                    "inspector_label_bg2": "#3a4a66",
+                    "inspector_header": "#3a4a66",
+                    "inspector_toggle_btn": "#3a4a66",
+                    "inspector_textbox_bg": "#f8fafc",
+                    "inspector_button_bg": "#93c5fd",
+
+                    "preset_canvas_bg": "#ffffff",
+                    "preset_inner_bg": "#ffffff",
+                    "preset_frame_bg": "#ffffff",
+                }
+            elif preset == 'lemon':
+                self.theme = {
+                    "canvas_background": "#fefce8",
+                    "from_lines": "#4ade80",
+                    "to_lines": "#a3e635",
+                    "randomEdgeFromColor": "#f97316",
+
+                    "default_node_color": "#fef9c3",
+                    "node_outline": "#fde68a",
+                    "node_selected_outline": "#4ade80",
+                    "multi_selected_outline": "#84cc16",
+                    "node_text_fill": "#422006",
+
+                    "inspector_bg": "#fefce8",
+                    "inspector_canvas_bg": "#fefce8",
+                    "title_lbl_bg": "#fefce8",
+                    "inspector_frame_bg": "#fefce8",
+                    "inspector_container": "#fef9c3",
+                    "inspector_body": "#fef9c3",
+                    "inspector_label_bg": "#fef9c3",
+                    "inspector_label_bg2": "#fde68a",
+                    "inspector_header": "#fde68a",
+                    "inspector_toggle_btn": "#fde68a",
+                    "inspector_textbox_bg": "#ffffff",
+                    "inspector_button_bg": "#a3e635",
+
+                    "preset_canvas_bg": "#ffffff",
+                    "preset_inner_bg": "#ffffff",
+                    "preset_frame_bg": "#ffffff",
+                }
+            elif preset == '90s':
+                self.theme = {
+                    "canvas_background": "#111111",
+                    "from_lines": "#cccccc",
+                    "to_lines": "#999999",
+                    "randomEdgeFromColor": "#eeeeee",
+
+                    "default_node_color": "#222222",
+                    "node_outline": "#555555",
+                    "node_selected_outline": "#ffffff",
+                    "multi_selected_outline": "#dddddd",
+                    "node_text_fill": "#eeeeee",
+
+                    "inspector_bg": "#181818",
+                    "inspector_canvas_bg": "#181818",
+                    "title_lbl_bg": "#181818",
+                    "inspector_frame_bg": "#181818",
+                    "inspector_container": "#282828",
+                    "inspector_body": "#282828",
+                    "inspector_label_bg": "#282828",
+                    "inspector_label_bg2": "#383838",
+                    "inspector_header": "#383838",
+                    "inspector_toggle_btn": "#383838",
+                    "inspector_textbox_bg": "#cccccc",
+                    "inspector_button_bg": "#444444",
+                    "inspector_text_fg": "#000000",
+
+                    "preset_canvas_bg": "#333333",
+                    "preset_inner_bg": "#333333",
+                    "preset_frame_bg": "#333333",
+                }
             
         try:
             #self.theme.setdefault('randomEdgeFromColor', '#8e44ff')
@@ -1197,51 +1344,49 @@ class VisualEditor(tk.Frame):
     def open_settings(self):
         win = tk.Toplevel(self)
         win.title("Settings")
-        ######################
-        var1 = tk.BooleanVar(value=self.settings["show_path"])
-        chk2 = tk.Checkbutton(win, text="Show path", variable=var1,
-                            command=lambda: self.settings.update(show_path=var1.get()))
-        chk2.pack(anchor="w", pady=4)
-        ######################
-        var = tk.BooleanVar(value=self.settings["disable_delete_confirm"])
-        chk2 = tk.Checkbutton(win, text="Disable deletion confirmation", variable=var,
-                            command=lambda: self.settings.update(disable_delete_confirm=var.get()))
-        chk2.pack(anchor="w", pady=4)
-        ######################
-        var01 = tk.BooleanVar(value=self.settings["disable_text_truncation"])
-        chk01 = tk.Checkbutton(win, text="Disable text truncation ('...')", variable=var01,
-                            command=lambda: self.settings.update(disable_text_truncation=var01.get()))
-        chk01.pack(anchor="w", pady=4)        
-        ######################
-        var2 = tk.BooleanVar(value=self.settings["udtdnc"])
-        chk3 = tk.Checkbutton(win, text="Use default themes' default node color, always.", variable=var2,
-                            command=lambda: self.settings.update(udtdnc=var2.get()))
-        chk3.pack(anchor="w", pady=4)
-        ######################
-        var3 = tk.BooleanVar(value=self.settings["change_node_colors"])
-        chk4 = tk.Checkbutton(win, text="Change all node colors to themes default node color after switching to a theme preset.", variable=var3,
-                            command=lambda: self.settings.update(change_node_colors=var3.get()))
-        chk4.pack(anchor="w", pady=4)
-        ######################
-        tk.Label(win, text="Keybinds:").pack(anchor="w", pady=(10,0))
-        for action, seq in self.settings["keybinds"].items():
-            frame = tk.Frame(win)
-            frame.pack(anchor="w", pady=2)
-            tk.Label(frame, text=action.capitalize()).pack(side=tk.LEFT, padx=4)
-            entry = tk.Entry(frame)
+        win.minsize(500, 250)
+
+        # --- Checkbox settings ---
+        checkbox_settings = [
+            ("show_path", "Show path in play mode at the end."),
+            ("disable_delete_confirm", "Disable deletion confirmation dialogs."),
+            ("disable_text_truncation", "Disable text truncation in nodes ('...')."),
+            ("udtdnc", "Use theme's default node color when creating a new node."),
+            ("change_node_colors", "Apply theme's default node color to all nodes when switching themes.")
+        ]
+
+        for key, text in checkbox_settings:
+            var = tk.BooleanVar(value=self.settings.get(key, False))
+            command = lambda k=key, v=var: self.settings.update({k: v.get()})
+            chk = tk.Checkbutton(win, text=text, variable=var, command=command, wraplength=480, justify=tk.LEFT)
+            chk.pack(anchor="w", pady=2, padx=4)
+
+        ttk.Separator(win).pack(fill='x', pady=10, padx=5)
+
+        # --- Keybind settings ---
+        tk.Label(win, text="Keybinds:").pack(anchor="w", padx=4)
+        
+        keybind_frame = tk.Frame(win)
+        keybind_frame.pack(fill='x', padx=4, pady=2)
+        keybind_frame.columnconfigure(1, weight=1) # Make entry expand
+
+        for i, (action, seq) in enumerate(self.settings["keybinds"].items()):
+            tk.Label(keybind_frame, text=action.capitalize()).grid(row=i, column=0, sticky='w', padx=4, pady=2)
+            
+            entry = tk.Entry(keybind_frame)
             entry.insert(0, seq)
-            entry.pack(side=tk.LEFT)
+            entry.grid(row=i, column=1, sticky='ew', padx=4, pady=2)
 
             def save_bind(a=action, e=entry):
                 self.settings["keybinds"][a] = e.get()
                 self.apply_keybinds()
 
-            tk.Button(frame, text="Apply", command=save_bind).pack(side=tk.LEFT, padx=4)
+            tk.Button(keybind_frame, text="Apply", command=save_bind).grid(row=i, column=2, sticky='e', padx=4, pady=2)
                 
     def open_themecontrol(self):
         self.win = tk.Toplevel(self)
         self.win.title("Theme")
-        self.win.geometry('205x300')
+        self.win.geometry('205x500')
         self.win.winfo_x = 0
         self.win.winfo_y = 0
 
@@ -1251,7 +1396,12 @@ class VisualEditor(tk.Frame):
         tk.Button(self.win, text='Ocean', command=lambda: self.themepreset('ocean', 1)).pack(side=tk.TOP, pady=4)
         tk.Button(self.win, text='Ocean (v2)', command=lambda: self.themepreset('ocean 2', 1)).pack(side=tk.TOP, pady=4) 
         tk.Button(self.win, text='Forest', command=lambda: self.themepreset('forest', 1)).pack(side=tk.TOP, pady=4)
-        tk.Button(self.win, text='Bubblegum', command=lambda: self.themepreset('bubblegum', 1)).pack(side=tk.TOP, pady=4)        
+        tk.Button(self.win, text='Bubblegum', command=lambda: self.themepreset('bubblegum', 1)).pack(side=tk.TOP, pady=4)
+        tk.Button(self.win, text='Underground', command=lambda: self.themepreset('underground', 1)).pack(side=tk.TOP, pady=4)
+        tk.Button(self.win, text='Sky', command=lambda: self.themepreset('sky', 1)).pack(side=tk.TOP, pady=4)
+        tk.Button(self.win, text='Night Sky', command=lambda: self.themepreset('night sky', 1)).pack(side=tk.TOP, pady=4)
+        tk.Button(self.win, text='Lemon', command=lambda: self.themepreset('lemon', 1)).pack(side=tk.TOP, pady=4)
+        tk.Button(self.win, text='90s', command=lambda: self.themepreset('90s', 1)).pack(side=tk.TOP, pady=4)
 
     def update_node_count(self):
         self.node_count_label.config(text=f"Nodes: {len(self.node_rects)}")
@@ -1930,7 +2080,7 @@ class VisualEditor(tk.Frame):
         for nid, data in nodes.items():
             x = data.get("x", 50)
             y = data.get("y", 50)
-            node_color = data.get("color", self.theme['default_node_color'])
+            node_color = data.get("color") or self.theme.get('default_node_color', '#222222')
 
             # Node rectangle
             if nid in self.node_rects:
@@ -1951,7 +2101,7 @@ class VisualEditor(tk.Frame):
             display_text = self.truncate_text_to_fit(full_text, font_obj, NODE_W-12, NODE_H-4)
 
             if nid in self.node_texts:
-                self.canvas.itemconfig(self.node_texts[nid], text=display_text)
+                self.canvas.itemconfig(self.node_texts[nid], text=display_text, fill=self.theme['node_text_fill'])
                 self.canvas.coords(self.node_texts[nid], x + 10, y + 10)
             else:
                 txt = self.canvas.create_text(
@@ -2578,20 +2728,23 @@ class VisualEditor(tk.Frame):
 
     def build_example(self): # builds an example scene
         nodes.clear(); vars_store.clear(); inventory.clear()
+
+        node_color = self.theme.get('default_node_color', '#222222')
+
         create_node(1, "You were met with a fork in the path.", x=60, y=80, options=[
             {"text":"Go left", "next":"2", "condition":None, "actions":[]},
             {"text":"Go right", "next":"3", "condition":None, "actions":[]}
-        ])
+        ], color=node_color)
         create_node(2, "You find a river blocking your path.", x=300, y=80, options=[
             {"text":"Swim across", "next":"4", "condition":None, "actions":["set:wet=True"]},
             {"text":"Turn back", "next":"1", "condition":None, "actions":[]}
-        ])
+        ], color=node_color)
         create_node(3, "You encounter a sleeping dragon.", x=300, y=240, options=[
             {"text":"Sneak past", "next":"4", "condition":None, "actions":[]},
             {"text":"Attack it", "next":"5", "condition":"has_item:sword", "actions":[]}
-        ])
-        create_node(4, "You made it to a small village. The end.", x=540, y=150, options=[])
-        create_node(5, "The dragon wakes up and roasts you. Oops.", x=540, y=280, options=[])
+        ], color=node_color)
+        create_node(4, "You made it to a small village. The end.", x=540, y=150, options=[], color=node_color)
+        create_node(5, "The dragon wakes up and roasts you. Oops.", x=540, y=280, options=[], color=node_color)
         inventory.append("rope")
         vars_store["mysterious_path"] = 7
         self.update_node_count()
