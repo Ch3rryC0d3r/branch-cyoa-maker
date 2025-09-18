@@ -1,6 +1,6 @@
 """ 
 Branch, a CYOA (Choose-Your-Own-Adventure) Maker.
-Version: v0.5.05
+Version: v0.5.06
 
 ******************************************To-Do******************************************
 
@@ -24,21 +24,17 @@ Version: v0.5.05
 ********************************************************************************************
 
 Changelog:
+@ v0.5.06 - 
+    * Added a new flexible 'if' statement syntax: `if(cond):<conditional_actions>unconditional_actions`.
+    * The colon and unconditional actions are optional, allowing for `if(cond)<conditional_actions>`.
+    * Updated documentation to reflect the new syntax.
+
 @ v0.5.05 - [removed 4th number for simplicity in version labels]
     * Fixed text truncation.
 
-@ v0.5.04.17 -
-    * Enhanced error syntax highlighting
-
-@ v0.5.04.16 -
-    * Added syntax highlighting to the 'Options' text box in the Node Inspector.
-    * Keywords, comments, variables, strings, and numbers are now colored.
-    * Unknown action keywords are highlighted in red to help spot typos.
-    * Cleaned up theme files to fix issues with syntax color loading.
-    * Fixed a bug where unsaved text in the inspector could be lost when changing selection.
-
 ...
 """
+VERSION = 'v0.5.06'
 
 # built-ins
 import os, re, ast, math, json, copy, random, operator
@@ -165,7 +161,12 @@ def parse_option_line(line: Union[str, Dict]) -> Optional[Dict]:
     while len(parts) < 4:
         parts.append("")
     text, nxt, cond, acts = parts[0], parts[1], parts[2], parts[3]
-    actions = [a.strip() for a in re.split(r'[&;]', acts) if a.strip()] if acts else []
+    # The action string should be processed by `execute_actions`, which has the
+    # necessary logic to handle complex `if` statements containing semicolons.
+    # Splitting the action string here breaks that logic by prematurely separating
+    # parts of a single `if` command.
+    # We pass the entire action string as a single item in the list.
+    actions = [acts] if acts.strip() else []
     cond = cond if cond else None
     nxt = nxt if nxt else None
     return {"text": text, "next": nxt, "condition": cond, "actions": actions, "instant": False}
@@ -234,7 +235,7 @@ def execute_actions(actions: List[str]):
                     continue
 
                 # ------------------ if(COND):<CONDITIONAL>UNCONDITIONAL ------------------
-                m_new_if = re.match(r"^if\((.+?)\):<(.+?)>(.*)$", sub)
+                m_new_if = re.match(r"^if\((.+?)\):?<(.+?)>(.*)$", sub)
                 if m_new_if:
                     cond_expr, conditional_expr, unconditional_expr = m_new_if.groups()
                     if evaluate_condition(cond_expr.strip()):
@@ -652,7 +653,8 @@ class VisualEditor(tk.Frame):
 
         tk.Button(self.toolbar, text="Settings", command=self.open_settings).pack(side=tk.LEFT) # settings button
         tk.Button(self.toolbar, text="Theme Control", command=self.open_themecontrol).pack(side=tk.LEFT) # theme control button
-        
+        tk.Label(self.toolbar, text=f'{VERSION}').pack(side=tk.RIGHT)
+
         self.menubar = tk.Menu(self.master)
         self.master.config(menu=self.menubar)
         self.master.protocol("WM_DELETE_WINDOW", self.on_exit)
