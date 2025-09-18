@@ -1,25 +1,11 @@
 """ 
 Branch, a CYOA (Choose-Your-Own-Adventure) Maker.
-Version: v0.5.09
-
-******************************************To-Do******************************************
-
-@1@ Fix zooming and fully re-add it [zooming].
-
-@3@ Add a setting field for 'default comment width' and 'default comment height' 
-    (added, however, I didn't add visual fields in the 'open_settings()' 
-    only the actual settings in the default settings.json{})
-
-@4@ Option line template button.
-
-@6@ add a setting, 'disable text truncation'.
-
-@7@ add a setting, 'pan speed'.
-
-@8@ make it where you can't move nodes while you're panning, I think you can as of now.
-********************************************************************************************
+Version: v0.5.10
 
 Changelog:
+@ v0.5.10 - 
+    * Added Chanced-Based Visibility Leaves. (learn more about it with the LeavesDocumentation.html)
+
 @ v0.5.09 -
     * In the node-right-click-menu, added a "Change ID" button.
 
@@ -36,12 +22,9 @@ Changelog:
     * The colon and unconditional actions are optional, allowing for `if(cond)<conditional_actions>`.
     * Updated documentation to reflect the new syntax.
 
-@ v0.5.05 - [removed 4th number for simplicity in version labels]
-    * Fixed text truncation.
-
 ...
 """
-VERSION = 'v0.5.09'
+VERSION = 'v0.5.10'
 
 # built-ins
 import os, re, ast, math, json, copy, random, operator
@@ -3119,13 +3102,36 @@ class VisualEditor(tk.Frame):
         # substitute variables in header
         self.play_header.config(text=self.substitute_vars(node.get("header", "")))
 
-        # Gather visible normal leaves
+        # Gather visible leaves
         visible = []
+
         for opt_raw in node.get("options", []):
             opt = parse_option_line(opt_raw)
             if not opt or opt.get("instant"):
                 continue
-            if evaluate_condition(opt.get("condition")):
+            cond_str = opt.get("condition", "") or ""
+            cond_parts = [p.strip() for p in re.split(r'[&;]', cond_str) if p.strip()]
+            
+            other_conds = []
+            chance_passed = True
+            
+            for part in cond_parts:
+                if part.startswith('chance(') and part.endswith(')'):
+                    try:
+                        chance_val = float(part[7:-1])
+                        if random.uniform(0, 100) > chance_val:
+                            chance_passed = False
+                            break # This chance failed, no need to check others for this leaf
+                    except (ValueError, IndexError):
+                        pass # Invalid chance() syntax, treat as no condition
+                else:
+                    other_conds.append(part)
+            
+            if not chance_passed:
+                continue # Skip this leaf entirely
+
+            remaining_cond = " & ".join(other_conds)
+            if evaluate_condition(remaining_cond):
                 visible.append(opt)
 
         for w in self.choice_frame.winfo_children():
