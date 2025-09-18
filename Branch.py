@@ -24,6 +24,11 @@ Version: v0.5.06
 ********************************************************************************************
 
 Changelog:
+@ v0.5.07 -
+    * Added `clamp(VAR:MIN,MAX)` action to constrain a variable within a numeric range.
+    * Added `consume(ITEM:ACTION)` shortcut to remove an item and then run an action.
+    * Updated documentation for new actions.
+
 @ v0.5.06 - 
     * Added a new flexible 'if' statement syntax: `if(cond):<conditional_actions>unconditional_actions`.
     * The colon and unconditional actions are optional, allowing for `if(cond)<conditional_actions>`.
@@ -34,7 +39,7 @@ Changelog:
 
 ...
 """
-VERSION = 'v0.5.06'
+VERSION = 'v0.5.07'
 
 # built-ins
 import os, re, ast, math, json, copy, random, operator
@@ -330,6 +335,78 @@ def execute_actions(actions: List[str]):
                                 weights.append(w)
                         if choices and weights:
                             vars_store[varname] = random.choices(choices, weights=weights, k=1)[0]
+                    continue
+
+                # ------------------ clamp(VAR:MIN,MAX) ------------------
+                m_clamp = re.match(r"^clamp\((.+?):(.+?),(.+?)\)$", sub)
+                if m_clamp:
+                    var_name, min_expr, max_expr = m_clamp.groups()
+                    var_name = var_name.strip()
+                    try:
+                        min_val = float(safe_eval_expr(min_expr.strip(), vars_store))
+                        max_val = float(safe_eval_expr(max_expr.strip(), vars_store))
+                        
+                        current_val = vars_store.get(var_name)
+                        if current_val is not None:
+                            try:
+                                current_val_num = float(current_val)
+                                clamped_val = max(min_val, min(current_val_num, max_val))
+                                # Preserve type if original was int
+                                if isinstance(current_val, int):
+                                    vars_store[var_name] = int(clamped_val)
+                                else:
+                                    vars_store[var_name] = clamped_val
+                            except (ValueError, TypeError):
+                                pass # Can't clamp a non-numeric value
+                    except Exception:
+                        pass # Ignore if min/max can't be evaluated
+                    continue
+
+                # ------------------ consume(ITEM:ACTION) ------------------
+                m_consume = re.match(r"^consume\((.+?):(.+)\)$", sub)
+                if m_consume:
+                    item_name, action_expr = m_consume.groups()
+                    item_name = item_name.strip()
+                    action_expr = action_expr.strip()
+                    if item_name in inventory:
+                        inventory.remove(item_name)
+                        execute_actions([action_expr])
+                    continue
+
+                # ------------------ clamp(VAR:MIN,MAX) ------------------
+                m_clamp = re.match(r"^clamp\((.+?):(.+?),(.+?)\)$", sub)
+                if m_clamp:
+                    var_name, min_expr, max_expr = m_clamp.groups()
+                    var_name = var_name.strip()
+                    try:
+                        min_val = float(safe_eval_expr(min_expr.strip(), vars_store))
+                        max_val = float(safe_eval_expr(max_expr.strip(), vars_store))
+                        
+                        current_val = vars_store.get(var_name)
+                        if current_val is not None:
+                            try:
+                                current_val_num = float(current_val)
+                                clamped_val = max(min_val, min(current_val_num, max_val))
+                                # Preserve type if original was int
+                                if isinstance(current_val, int):
+                                    vars_store[var_name] = int(clamped_val)
+                                else:
+                                    vars_store[var_name] = clamped_val
+                            except (ValueError, TypeError):
+                                pass # Can't clamp a non-numeric value
+                    except Exception:
+                        pass # Ignore if min/max can't be evaluated
+                    continue
+
+                # ------------------ consume(ITEM:ACTION) ------------------
+                m_consume = re.match(r"^consume\((.+?):(.+)\)$", sub)
+                if m_consume:
+                    item_name, action_expr = m_consume.groups()
+                    item_name = item_name.strip()
+                    action_expr = action_expr.strip()
+                    if item_name in inventory:
+                        inventory.remove(item_name)
+                        execute_actions([action_expr])
                     continue
 
                 # ------------------ clearinv ------------------
@@ -1518,6 +1595,8 @@ class VisualEditor(tk.Frame):
         if s.startswith("weighted(") and s.endswith(")"): return True
         if s.startswith("randr(") and s.endswith(")"): return True
         if s.startswith("rands(") and s.endswith(")"): return True
+        if s.startswith("clamp(") and s.endswith(")"): return True
+        if s.startswith("consume(") and s.endswith(")"): return True
         if s == "clearinv": return True
         # Assignment: var=... var+=...
         if re.match(r"^[A-Za-z_][A-Za-z0-9_]*\s*([\+\-\*/]?=)", s): return True
@@ -1587,14 +1666,15 @@ class VisualEditor(tk.Frame):
         
         self.known_keywords = {
             'if', 'once', 'repeat', 'chance', 'weighted', 'randr', 'rands', 'goto',
-            'add_item', 'remove_item', 'clearinv', 'set', 'not_has_item', 'has_item'
+            'add_item', 'remove_item', 'clearinv', 'set', 'not_has_item', 'has_item',
+            'clamp', 'consume'
         }
         
         # Patterns for highlighting. Order matters.
         self.highlight_patterns = [
             ("syntax_comment", re.compile(r'#.*')),
             ("syntax_variable", re.compile(r'\{[A-Za-z_][A-Za-z0-9_]*\}')),
-            ("syntax_string", recompile(r'"[^"]*"|\'[^\']*\'')),
+            ("syntax_string", re.compile(r'"[^"]*"|\'[^\']*\'')),
             ("syntax_keyword", re.compile(r'\b(' + '|'.join(self.known_keywords) + r')\b')),
             ("syntax_number", re.compile(r'\b-?\d+(\.\d+)?\b')),
             ("syntax_separator", re.compile(r'\||>>?|[:&;]')),
@@ -1602,7 +1682,7 @@ class VisualEditor(tk.Frame):
         ]
         
         self.error_pattern = re.compile(r'\b([a-zA-Z_]+)(?=:)\b')
-        self.known_action_prefixes = {'add_item', 'remove_item', 'goto', 'once', 'repeat', 'set', 'var', 'has_item', 'not_has_item', 'weighted', 'randr', 'rands'}
+        self.known_action_prefixes = {'add_item', 'remove_item', 'goto', 'once', 'repeat', 'set', 'var', 'has_item', 'not_has_item', 'weighted', 'randr', 'rands', 'clamp', 'consume'}
 
         # Bind events
         self.options_text.bind("<<Modified>>", self._schedule_highlight, add="+")
@@ -3066,11 +3146,7 @@ class VisualEditor(tk.Frame):
         vars_store["mysterious_path"] = 7
         self.update_node_count()
         self.redraw()
-
-def recompile(pattern):
-    """Helper to silence potential re.Pattern type errors in older linters."""
-    return re.compile(pattern)
-
+        
 def main(): # main
     root = tk.Tk()
     root.geometry("1200x700")
