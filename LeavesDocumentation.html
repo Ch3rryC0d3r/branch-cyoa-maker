@@ -71,6 +71,16 @@ Go right | 3 | |
   <li><code>var:CLICKS==1</code> → An explicit way to check a variable's value (the <code>var:</code> prefix is optional).</li>
 </ul>
 
+<div class="example">
+  <p><strong>Chance-Based Visibility Example:</strong></p>
+  <pre><code>Search the forest | 8 | chance(40) |  
+Search the cave | 9 | chance(90) |</code></pre>
+  <p>In this node, "Search the forest" has a 40% chance to be visible, and "Search the cave" has a 90% chance to be visible. It's possible for both, one, or neither to appear.
+  This is different from the <code>weighted()</code> <em>action</em>, which picks one outcome from a pool.
+  You can mix this with other conditions, for example: <code>has_item:torch & chance(50)</code>. The leaf will only be visible if the player has a torch AND the 50% chance roll succeeds.
+  </p>
+</div>
+
 <h2>Actions</h2>
 <p>Actions are commands that execute when a Leaf is chosen. You can chain multiple actions together using <code>&</code> or <code>;</code>.</p>
 
@@ -151,7 +161,7 @@ Go right | 3 | |
 
 </main>
 <footer>
-  <p>Last updated for Branch v0.5.09</p>
+  <p>Last updated for Branch v0.5.10</p>
 </footer>
 </body>
 </html>
