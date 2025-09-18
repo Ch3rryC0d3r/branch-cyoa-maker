@@ -1,6 +1,6 @@
 """ 
 Branch, a CYOA (Choose-Your-Own-Adventure) Maker.
-Version: v0.5.06
+Version: v0.5.08
 
 ******************************************To-Do******************************************
 
@@ -24,6 +24,9 @@ Version: v0.5.06
 ********************************************************************************************
 
 Changelog:
+@ v0.5.08 - 
+    * Fixed "Variables & Inventory" to be default variable values, as intended.
+
 @ v0.5.07 -
     * Added `clamp(VAR:MIN,MAX)` action to constrain a variable within a numeric range.
     * Added `consume(ITEM:ACTION)` shortcut to remove an item and then run an action.
@@ -39,7 +42,7 @@ Changelog:
 
 ...
 """
-VERSION = 'v0.5.07'
+VERSION = 'v0.5.08'
 
 # built-ins
 import os, re, ast, math, json, copy, random, operator
@@ -679,6 +682,8 @@ class VisualEditor(tk.Frame):
         self.undo_stack = [] # undo stack, or 'undo list'
         self._highlight_job = None # For debouncing syntax highlighting
         self.theme = {} # define 'self.theme' for later use
+        self.editor_vars_backup = None
+        self.editor_inventory_backup = None
 
         # --- comment system state ---
         self.selected_comment = None
@@ -2986,6 +2991,11 @@ class VisualEditor(tk.Frame):
             self.enter_editor_mode()
 
     def enter_play_mode(self): # enter play mode
+        # Backup the editor's variable state before starting play mode
+        self._apply_pending_inspector_edits() # Ensure globals are up-to-date with UI
+        self.editor_vars_backup = copy.deepcopy(vars_store)
+        self.editor_inventory_backup = inventory.copy()
+
         self.mode = "play"
         self.mode_button.config(text="Switch to Editor Mode")
         self.reset_state()
@@ -3010,12 +3020,25 @@ class VisualEditor(tk.Frame):
         self.play_render_current()
 
     def enter_editor_mode(self): # enter editor mode
+        global vars_store, inventory
         self.mode = "editor"
         self.mode_button.config(text="Switch to Play Mode")
+
+        # Restore the editor's variable state from backup
+        if self.editor_vars_backup is not None:
+            vars_store = self.editor_vars_backup
+            self.editor_vars_backup = None
+        if self.editor_inventory_backup is not None:
+            inventory = self.editor_inventory_backup
+            self.editor_inventory_backup = None
+
         try:
             self.play_window.destroy()
         except Exception:
             pass
+
+        # Refresh the inspector to show the restored values
+        self.load_selected_into_inspector()
 
     def close_play(self): # close play
         self.enter_editor_mode()
