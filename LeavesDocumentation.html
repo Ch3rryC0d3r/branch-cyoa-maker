@@ -87,6 +87,13 @@ Go right | 3 | |
   <li><code>clearinv</code> → Wipes the entire inventory.</li>
 </ul>
 
+<h3>Utility Actions</h3>
+<ul>
+  <li><code>clamp(HP:0,100)</code> → Ensures the 'HP' variable stays between 0 and 100. If HP was 110, it becomes 100. If it was -5, it becomes 0. The min/max values can be numbers or other variables.</li>
+  <li><code>consume(Key:goto:12)</code> → A shortcut action. It first checks if the player has "Key". If so, it removes "Key" from the inventory and then executes the action (<code>goto:12</code>). If the player doesn't have the item, nothing happens.</li>
+</ul>
+
+
 <h3>Flow Control</h3>
 <ul>
   <li><code>goto:10</code> → Immediately jumps the player to Node 10.</li>
@@ -144,7 +151,7 @@ Go right | 3 | |
 
 </main>
 <footer>
-  <p>Last updated for Branch v0.5.05</p>
+  <p>Last updated for Branch v0.5.07</p>
 </footer>
 </body>
 </html>
