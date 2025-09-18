@@ -1,20 +1,16 @@
 """ 
 Branch, a CYOA (Choose-Your-Own-Adventure) Maker.
-Version: v0.5.08
+Version: v0.5.09
 
 ******************************************To-Do******************************************
 
-@1@ Fix zooming and fully re-add it [zooming]. Calling 'redraw()' never drawed the nodes with sizes based on the 'current_zoom', 
-    I've tried before, however, the node offset way too far (~ 1,-1) each time I tried to dragged a node.
-    
-@2@ Add a 'Change ID' in the node right-click menu. 
+@1@ Fix zooming and fully re-add it [zooming].
 
 @3@ Add a setting field for 'default comment width' and 'default comment height' 
     (added, however, I didn't add visual fields in the 'open_settings()' 
     only the actual settings in the default settings.json{})
 
-@4@ Option line template button (adds a template like, line1:'Template | 1 |  | ', or the next available 
-    (not max+1, the min available) line due to the user might have some already written lines.)
+@4@ Option line template button.
 
 @6@ add a setting, 'disable text truncation'.
 
@@ -24,6 +20,9 @@ Version: v0.5.08
 ********************************************************************************************
 
 Changelog:
+@ v0.5.09 -
+    * In the node-right-click-menu, added a "Change ID" button.
+
 @ v0.5.08 - 
     * Fixed "Variables & Inventory" to be default variable values, as intended.
 
@@ -42,7 +41,7 @@ Changelog:
 
 ...
 """
-VERSION = 'v0.5.08'
+VERSION = 'v0.5.09'
 
 # built-ins
 import os, re, ast, math, json, copy, random, operator
@@ -338,42 +337,6 @@ def execute_actions(actions: List[str]):
                                 weights.append(w)
                         if choices and weights:
                             vars_store[varname] = random.choices(choices, weights=weights, k=1)[0]
-                    continue
-
-                # ------------------ clamp(VAR:MIN,MAX) ------------------
-                m_clamp = re.match(r"^clamp\((.+?):(.+?),(.+?)\)$", sub)
-                if m_clamp:
-                    var_name, min_expr, max_expr = m_clamp.groups()
-                    var_name = var_name.strip()
-                    try:
-                        min_val = float(safe_eval_expr(min_expr.strip(), vars_store))
-                        max_val = float(safe_eval_expr(max_expr.strip(), vars_store))
-                        
-                        current_val = vars_store.get(var_name)
-                        if current_val is not None:
-                            try:
-                                current_val_num = float(current_val)
-                                clamped_val = max(min_val, min(current_val_num, max_val))
-                                # Preserve type if original was int
-                                if isinstance(current_val, int):
-                                    vars_store[var_name] = int(clamped_val)
-                                else:
-                                    vars_store[var_name] = clamped_val
-                            except (ValueError, TypeError):
-                                pass # Can't clamp a non-numeric value
-                    except Exception:
-                        pass # Ignore if min/max can't be evaluated
-                    continue
-
-                # ------------------ consume(ITEM:ACTION) ------------------
-                m_consume = re.match(r"^consume\((.+?):(.+)\)$", sub)
-                if m_consume:
-                    item_name, action_expr = m_consume.groups()
-                    item_name = item_name.strip()
-                    action_expr = action_expr.strip()
-                    if item_name in inventory:
-                        inventory.remove(item_name)
-                        execute_actions([action_expr])
                     continue
 
                 # ------------------ clamp(VAR:MIN,MAX) ------------------
@@ -2025,6 +1988,7 @@ class VisualEditor(tk.Frame):
 
         
         menu = tk.Menu(self, tearoff=0)
+        menu.add_command(label="Change ID", command=lambda: self.change_node_id(clicked_node))
         menu.add_command(label="Duplicate", command=self.duplicate_multi_nodes)
         menu.add_command(label="Connect", command=lambda: self.enter_connection_mode(clicked_node))
         menu.add_command(label="Disconnect", command=lambda: self.enter_disconnect_mode(clicked_node))
@@ -2162,6 +2126,64 @@ class VisualEditor(tk.Frame):
         self.selected_node = new_ids[0] if new_ids else None
         self.multi_selected_nodes.clear()
         self.redraw()
+
+    def change_node_id(self, old_id: int):
+        """Prompts the user to change the ID of a node and updates all references."""
+        if old_id not in nodes:
+            return
+
+        new_id = simpledialog.askinteger(
+            "Change Node ID",
+            f"Enter new ID for node {old_id}:",
+            parent=self,
+            minvalue=1
+        )
+
+        if new_id is None or new_id == old_id:
+            return
+
+        if new_id in nodes:
+            messagebox.showerror("Error", f"Node ID {new_id} is already in use.", parent=self)
+            return
+
+        self.push_undo()
+
+        # Move the node data to the new ID
+        nodes[new_id] = nodes.pop(old_id)
+
+        # Update all references to the old ID across all nodes
+        for nid, data in nodes.items():
+            options_changed = False
+            
+            # 1. Update the parsed options list
+            for opt in data.get("options", []):
+                next_val = opt.get("next")
+                if next_val is None: continue
+
+                if isinstance(next_val, str) and "/" in next_val:
+                    parts = [p.strip() for p in next_val.split("/")]
+                    if str(old_id) in parts:
+                        new_parts = [str(new_id) if p == str(old_id) else p for p in parts]
+                        opt["next"] = "/".join(new_parts)
+                        options_changed = True
+                elif str(next_val) == str(old_id):
+                    opt["next"] = str(new_id)
+                    options_changed = True
+            
+            # 2. If references were found, regenerate the raw_options string to match
+            if options_changed:
+                data["raw_options"] = "\n".join([format_option_line(opt) for opt in data["options"]])
+
+        # Update START_NODE if it was the changed node
+        global START_NODE
+        if START_NODE == old_id:
+            START_NODE = new_id
+
+        # Update selection state
+        self.selected_node = new_id
+
+        self.redraw()
+        self.load_selected_into_inspector()
 
     def duplicate_node(self, nid): # duplicate a node
         new_id = max(nodes.keys()) + 1
