@@ -49,8 +49,6 @@ Branch is packed with features to make story creation intuitive and powerful.
 
 ## 🛠️ Installation
 
-⚠️ For sound support (`play:SOUND`), install [`pygame`](https://pypi.org/project/pygame/):
-
 ```bash
 pip install pygame
 ```
@@ -64,6 +62,8 @@ python Branch.py
 ```
 
 Requires **Python 3.8+** (Tkinter is included by default).
+
+You can also install the Branch.py file locally and run that. (right-click the file > open with... > python | or you can run ```py Branch.py``` in terminal, make sure you've cd'd into the file location though
 
 ---
 
