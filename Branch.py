@@ -1,10 +1,13 @@
 """ 
 Branch, a CYOA (Choose-Your-Own-Adventure) Maker.
-Version: v0.5.10
+Version: v0.5.11
 
 Changelog:
+@ v0.5.11 -
+    * Added node-level timers. Check out the Leaves Documentation to learn more.
+
 @ v0.5.10 - 
-    * Added Chanced-Based Visibility Leaves. (learn more about it with the LeavesDocumentation.html)
+    * Added Chanced-Based Visibility Leaves. (learn more about it with the leaves documentation)
 
 @ v0.5.09 -
     * In the node-right-click-menu, added a "Change ID" button.
@@ -24,7 +27,7 @@ Changelog:
 
 ...
 """
-VERSION = 'v0.5.10'
+VERSION = 'v0.5.11'
 
 # built-ins
 import os, re, ast, math, json, copy, random, operator
@@ -142,6 +145,13 @@ def parse_option_line(line: Union[str, Dict]) -> Optional[Dict]:
     raw = line.strip()
     if not raw or raw.startswith("#"):
         return None
+    
+    # @timer(SECONDS):>ACTION leaf
+    timer_match = re.match(r"@timer\((\d+)\):>(.+)", raw)
+    if timer_match:
+        seconds = timer_match.group(1)
+        action = timer_match.group(2).strip()
+        return {"instant": True, "timer": int(seconds), "actions": [action]}
 
     # instant leaf (starts with @) → no text/next/cond, only actions
     if raw.startswith("@"):
@@ -163,6 +173,11 @@ def parse_option_line(line: Union[str, Dict]) -> Optional[Dict]:
 
 def format_option_line(opt: Dict) -> str:
     if opt.get("instant"):
+        # Handle timed instant leaves
+        if "timer" in opt:
+            seconds = opt.get("timer")
+            action = ";".join(opt.get("actions", []))
+            return f"@timer({seconds}):>{action}"
         # For instant leaves, prepend '@' to the first action
         acts = ";".join(opt.get("actions", []))
         return f"@{acts}" if acts else "@"
@@ -548,6 +563,10 @@ def run_instant_leaves(node_id: int) -> int:
                 continue
 
             if opt and opt.get("instant"):
+                # Timer leaves are handled by the play loop, not here.
+                if "timer" in opt:
+                    continue
+
                 execute_actions(opt.get("actions", []))
                 # handle cascading goto
                 if "__goto" in vars_store:
@@ -629,6 +648,7 @@ class VisualEditor(tk.Frame):
         self._highlight_job = None # For debouncing syntax highlighting
         self.theme = {} # define 'self.theme' for later use
         self.editor_vars_backup = None
+        self.play_timer_job = None
         self.editor_inventory_backup = None
 
         # --- comment system state ---
@@ -3046,6 +3066,11 @@ class VisualEditor(tk.Frame):
         self.load_selected_into_inspector()
 
     def close_play(self): # close play
+        # Cancel any pending timer job when closing the play window
+        if hasattr(self, 'play_timer_job') and self.play_timer_job:
+            self.after_cancel(self.play_timer_job)
+            self.play_timer_job = None
+
         self.enter_editor_mode()
 
     def reset_state(self): # reset state (variables and inventory for play mode)
@@ -3069,6 +3094,11 @@ class VisualEditor(tk.Frame):
                     vars_store[name] = val
 
     def play_restart(self): # restart the play [mode] session
+        # Cancel any pending timer job on restart
+        if hasattr(self, 'play_timer_job') and self.play_timer_job:
+            self.after_cancel(self.play_timer_job)
+            self.play_timer_job = None
+
         self.reset_state()
         self.play_current = START_NODE; self.play_path = []; self.play_render_current()
 
@@ -3082,6 +3112,11 @@ class VisualEditor(tk.Frame):
         return re.sub(r"\{(\w+)\}", repl, text)
  
     def play_render_current(self):
+        # Cancel any pending timer from the previous node
+        if hasattr(self, 'play_timer_job') and self.play_timer_job:
+            self.after_cancel(self.play_timer_job)
+            self.play_timer_job = None
+
         # Run instant leaves (cascading gotos included)
         self.play_current = run_instant_leaves(self.play_current)
 
@@ -3101,6 +3136,17 @@ class VisualEditor(tk.Frame):
 
         # substitute variables in header
         self.play_header.config(text=self.substitute_vars(node.get("header", "")))
+
+        # Scan for and set up a node-level timer
+        for opt_raw in node.get("options", []):
+            opt = parse_option_line(opt_raw)
+            if opt and opt.get("instant") and "timer" in opt:
+                seconds = opt.get("timer")
+                actions = opt.get("actions", [])
+                if seconds and actions:
+                    # Schedule the timer to fire after N seconds
+                    self.play_timer_job = self.after(seconds * 1000, lambda a=actions: self._execute_timed_action(a))
+                    break # Only one timer per node is supported
 
         # Gather visible leaves
         visible = []
@@ -3159,7 +3205,31 @@ class VisualEditor(tk.Frame):
             )
             btn.pack(pady=2)
 
+    def _execute_timed_action(self, actions: List[str]):
+        # Ensure play window is still active
+        if not hasattr(self, 'play_window') or not self.play_window.winfo_exists():
+            return
+
+        self.play_timer_job = None # Clear the job reference
+
+        execute_actions(actions)
+
+        # If the action was a 'goto', it will set a special variable.
+        if "__goto" in vars_store:
+            nxt = resolve_next(vars_store.pop("__goto"))
+            if nxt is not None:
+                self.play_current = nxt
+                self.play_render_current() # Render the new node
+        else:
+            # If not a goto, re-render the current node to show any variable changes
+            self.play_render_current()
+
     def play_pick(self, opt):
+        # A choice was picked, so cancel any active timer.
+        if hasattr(self, 'play_timer_job') and self.play_timer_job:
+            self.after_cancel(self.play_timer_job)
+            self.play_timer_job = None
+
         execute_actions(opt.get("actions", []))
         nxt = resolve_next(opt.get("next"))
         if nxt is None:
