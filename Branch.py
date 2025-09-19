@@ -5,6 +5,7 @@ Version: v0.5.11
 Changelog:
 @ v0.5.11 -
     * Added node-level timers. Check out the Leaves Documentation to learn more.
+    * Added choice-level timers. Check out the Leaves Documentation to learn more.
 
 @ v0.5.10 - 
     * Added Chanced-Based Visibility Leaves. (learn more about it with the leaves documentation)
@@ -30,7 +31,7 @@ Changelog:
 VERSION = 'v0.5.11'
 
 # built-ins
-import os, re, ast, math, json, copy, random, operator
+import os, re, ast, math, json, copy, random, operator, time
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 # tkinter
@@ -649,6 +650,9 @@ class VisualEditor(tk.Frame):
         self.theme = {} # define 'self.theme' for later use
         self.editor_vars_backup = None
         self.play_timer_job = None
+        self.play_lifetime_jobs = []
+        self.lifetime_start_times = {}
+        self.last_rendered_node = None        
         self.editor_inventory_backup = None
 
         # --- comment system state ---
@@ -3071,6 +3075,13 @@ class VisualEditor(tk.Frame):
             self.after_cancel(self.play_timer_job)
             self.play_timer_job = None
 
+        # Cancel any pending choice-level lifetime jobs
+        if hasattr(self, 'play_lifetime_jobs'):
+            for job in self.play_lifetime_jobs:
+                self.after_cancel(job)
+            self.play_lifetime_jobs = []
+            self.lifetime_start_times = {}
+
         self.enter_editor_mode()
 
     def reset_state(self): # reset state (variables and inventory for play mode)
@@ -3099,6 +3110,13 @@ class VisualEditor(tk.Frame):
             self.after_cancel(self.play_timer_job)
             self.play_timer_job = None
 
+        # Cancel any pending choice-level lifetime jobs
+        if hasattr(self, 'play_lifetime_jobs'):
+            for job in self.play_lifetime_jobs:
+                self.after_cancel(job)
+            self.play_lifetime_jobs = []
+            self.lifetime_start_times = {}
+
         self.reset_state()
         self.play_current = START_NODE; self.play_path = []; self.play_render_current()
 
@@ -3116,6 +3134,16 @@ class VisualEditor(tk.Frame):
         if hasattr(self, 'play_timer_job') and self.play_timer_job:
             self.after_cancel(self.play_timer_job)
             self.play_timer_job = None
+
+        # On new node, reset lifetime timers
+        if not hasattr(self, 'last_rendered_node') or self.last_rendered_node != self.play_current:
+            if hasattr(self, 'play_lifetime_jobs'):
+                for job in self.play_lifetime_jobs:
+                    self.after_cancel(job)
+                self.play_lifetime_jobs = []
+            if hasattr(self, 'lifetime_start_times'):
+                self.lifetime_start_times = {}
+            self.last_rendered_node = self.play_current
 
         # Run instant leaves (cascading gotos included)
         self.play_current = run_instant_leaves(self.play_current)
@@ -3151,11 +3179,34 @@ class VisualEditor(tk.Frame):
         # Gather visible leaves
         visible = []
 
-        for opt_raw in node.get("options", []):
+        # Use enumerate() to get the index of each option
+        for i, opt_raw in enumerate(node.get("options", [])):
             opt = parse_option_line(opt_raw)
             if not opt or opt.get("instant"):
                 continue
             cond_str = opt.get("condition", "") or ""
+
+            # Handle lifetime(N) condition
+            lifetime_match = re.search(r'lifetime\((\d+)\)', cond_str)
+            if lifetime_match:
+                lifetime_seconds = int(lifetime_match.group(1))
+
+                # Corrected: Use a tuple with the immutable index `i` as the key.
+                key = (self.play_current, i)
+                
+                start_time = self.lifetime_start_times.get(key)
+                if start_time:
+                    if time.time() - start_time >= lifetime_seconds:
+                        continue # This choice has expired
+                else:
+                    # First time seeing this choice in this node, start its timer
+                    self.lifetime_start_times[key] = time.time()
+                    job = self.after(lifetime_seconds * 1000, self.play_render_current)
+                    self.play_lifetime_jobs.append(job)
+                
+                # Remove lifetime() from condition string so it's not evaluated further
+                cond_str = cond_str[:lifetime_match.start()] + cond_str[lifetime_match.end():]
+                    
             cond_parts = [p.strip() for p in re.split(r'[&;]', cond_str) if p.strip()]
             
             other_conds = []
@@ -3229,6 +3280,13 @@ class VisualEditor(tk.Frame):
         if hasattr(self, 'play_timer_job') and self.play_timer_job:
             self.after_cancel(self.play_timer_job)
             self.play_timer_job = None
+
+        # Cancel any pending choice-level lifetime jobs
+        if hasattr(self, 'play_lifetime_jobs'):
+            for job in self.play_lifetime_jobs:
+                self.after_cancel(job)
+            self.play_lifetime_jobs = []
+            # No need to clear lifetime_start_times here, it's handled by play_render_current on node change
 
         execute_actions(opt.get("actions", []))
         nxt = resolve_next(opt.get("next"))
