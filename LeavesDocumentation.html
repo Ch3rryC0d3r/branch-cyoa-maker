@@ -129,6 +129,20 @@ Search the cave | 9 | chance(90) |</code></pre>
 <pre><code>@HP-=5
 @if(is_cursed)&gt;add_item:Curse</code></pre>
 
+<h3>Timed Instant Actions (@timer)</h3>
+<p>A special type of instant action that executes after a delay. This is useful for creating time-sensitive events or consequences for waiting too long.</p>
+<pre><code>@timer(SECONDS):&gt;ACTION</code></pre>
+<ul>
+    <li><strong>SECONDS</strong> → The number of seconds to wait before the action runs.</li>
+    <li><strong>ACTION</strong> → The action to execute (e.g., <code>goto:10</code>, <code>HP-=10</code>).</li>
+</ul>
+<div class="example">
+  <p><strong>Example:</strong></p>
+  <pre><code>@timer(5):&gt;goto:10</code></pre>
+  <p>When a player enters this node, a 5-second timer starts. If the player doesn't make a choice within that time, they are automatically sent to Node 10. If they do make a choice, the timer is cancelled.</p>
+  <p>Only one timer per node is supported. If multiple <code>@timer</code> lines exist, only the first one will be used.</p>
+</div>
+
 <h2>Conditional Actions (if)</h2>
 <p>The <code>if</code> statement is a powerful action that lets you run other actions only if a certain condition is met. It has a few different forms.</p>
 
@@ -161,7 +175,7 @@ Search the cave | 9 | chance(90) |</code></pre>
 
 </main>
 <footer>
-  <p>Last updated for Branch v0.5.10</p>
+  <p>Last updated for Branch v0.5.11</p>
 </footer>
 </body>
 </html>
