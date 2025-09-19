@@ -224,9 +224,7 @@ def execute_actions(actions: List[str]):
     for act in actions:
         if not act:
             continue
-        
-        # If the action is an 'if' statement, treat it as a single unit to handle complex actions.
-        # Otherwise, split into sub-actions.
+
         if act.strip().startswith('if('):
             subs = [act.strip()]
         else:
@@ -481,7 +479,8 @@ def execute_actions(actions: List[str]):
                     except Exception:
                         vars_store[name] = val_expr
 
-            except Exception:
+            except Exception as e:
+                # You can add a print statement here to debug any unexpected action parsing errors.
                 continue
 
 def resolve_next(next_ref: Union[int, str]) -> Optional[int]: # resolve the next node for options
@@ -1628,6 +1627,7 @@ class VisualEditor(tk.Frame):
             "syntax_keyword", "syntax_comment", "syntax_string", "syntax_number",
             "syntax_variable", "syntax_separator", "syntax_operator", "syntax_error"
         ]
+        self.syntax_tags.append("syntax_function_name") # Add new tag for function names
         
         # Define colors for tags from theme
         self.options_text.tag_configure("syntax_keyword", foreground=self.theme.get("syntax_keyword", "#c586c0"))
@@ -1637,22 +1637,25 @@ class VisualEditor(tk.Frame):
         self.options_text.tag_configure("syntax_variable", foreground=self.theme.get("syntax_variable", "#9cdcfe"))
         self.options_text.tag_configure("syntax_separator", foreground=self.theme.get("syntax_separator", "#d4d4d4"))
         self.options_text.tag_configure("syntax_operator", foreground=self.theme.get("syntax_operator", "#d4d4d4"))
+        self.options_text.tag_configure("syntax_operator", foreground=self.theme.get("syntax_operator", "#d4d4d4")) 
         self.options_text.tag_configure("syntax_error", foreground=self.theme.get("syntax_error", "#f44747"), underline=True)
+        self.options_text.tag_configure("syntax_function_name", foreground=self.theme.get("syntax_variable", "#9cdcfe")) # Use variable color for function names
         
         self.known_keywords = {
             'if', 'once', 'repeat', 'chance', 'weighted', 'randr', 'rands', 'goto',
             'add_item', 'remove_item', 'clearinv', 'set', 'not_has_item', 'has_item',
-            'clamp', 'consume'
+            'clamp', 'consume', '$ACT' # Added $ACT keyword
         }
         
         # Patterns for highlighting. Order matters.
         self.highlight_patterns = [
             ("syntax_comment", re.compile(r'#.*')),
             ("syntax_variable", re.compile(r'\{[A-Za-z_][A-Za-z0-9_]*\}')),
+            ("syntax_function_name_pattern", re.compile(r'&([A-Za-z_][A-Za-z0-9_]*)\(')), # New pattern for function names in calls
             ("syntax_string", re.compile(r'"[^"]*"|\'[^\']*\'')),
             ("syntax_keyword", re.compile(r'\b(' + '|'.join(self.known_keywords) + r')\b')),
             ("syntax_number", re.compile(r'\b-?\d+(\.\d+)?\b')),
-            ("syntax_separator", re.compile(r'\||>>?|[:&;]')),
+            ("syntax_separator", re.compile(r'\||>>?|[:&;()]')), # Added parentheses to separators
             ("syntax_operator", re.compile(r'[\+\-\*/]?=')),
         ]
         
@@ -1688,8 +1691,13 @@ class VisualEditor(tk.Frame):
             line_num = i + 1
             for tag, pattern in self.highlight_patterns:
                 for match in pattern.finditer(line):
-                    start, end = match.span()
-                    self.options_text.tag_add(tag, f"{line_num}.{start}", f"{line_num}.{end}")
+                    if tag == "syntax_function_name_pattern":
+                        # Apply 'syntax_function_name' tag to the captured group (the function name)
+                        func_name_start, func_name_end = match.span(1)
+                        self.options_text.tag_add("syntax_function_name", f"{line_num}.{func_name_start}", f"{line_num}.{func_name_end}")
+                    else:
+                        start, end = match.span()
+                        self.options_text.tag_add(tag, f"{line_num}.{start}", f"{line_num}.{end}")
             self.highlight_line_errors(line, line_num)
 
     def open_themecontrol(self):
@@ -2135,7 +2143,6 @@ class VisualEditor(tk.Frame):
         self.redraw()
 
     def change_node_id(self, old_id: int):
-        """Prompts the user to change the ID of a node and updates all references."""
         if old_id not in nodes:
             return
 
