@@ -81,6 +81,12 @@ Search the cave | 9 | chance(90) |</code></pre>
   </p>
 </div>
 
+<div class="example">
+  <p><strong>Timed Choice Example (lifetime):</strong></p>
+  <pre><code>Quick, grab the idol! | 12 | lifetime(10) | add_item:Idol</code></pre>
+  <p>The <code>lifetime(SECONDS)</code> condition makes a choice available for only a limited time. When the node loads, a 10-second timer starts for this choice. If the player doesn't pick it within that time, the choice will disappear. This can be combined with other conditions, like <code>has_item:torch & lifetime(5)</code>.</p>
+</div>
+
 <h2>Actions</h2>
 <p>Actions are commands that execute when a Leaf is chosen. You can chain multiple actions together using <code>&</code> or <code>;</code>.</p>
 
