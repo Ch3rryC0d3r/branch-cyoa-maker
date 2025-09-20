@@ -3,26 +3,144 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Branch - Leaves Documentation</title>
+<title>Branch Documentation</title>
 <style>
-  body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #fdfdfd; color: #333; line-height: 1.6; margin: 0; padding: 0; }
-  header { background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%); color: white; padding: 2rem; text-align: center; }
-  header h1 { margin: 0; font-size: 2.5rem; }
-  main { max-width: 1000px; margin: 2rem auto; padding: 1rem 2rem; background: #fff; border-radius: 10px; box-shadow: 0 5px 20px rgba(0,0,0,0.08); }
-  h2 { border-bottom: 3px solid #2575fc; padding-bottom: 0.5rem; margin-top: 2rem; color: #222; }
-  footer { text-align: center; margin-top: 2rem; color: #777; font-size: 0.9rem; }
-  h3 { margin-top: 1.5rem; color: #444; }
-  p { margin: 1rem 0; }
-  code, pre { background: #f4f4f4; padding: 0.2rem 0.4rem; border-radius: 5px; font-family: Consolas, monospace; }
-  pre { display: block; padding: 1rem; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word; }
-  ul { margin: 1rem 0 1rem 1.5rem; }
-  .example { background: #f0f8ff; border-left: 5px solid #2575fc; padding: 1rem; margin: 1rem 0; border-radius: 6px; }
+  :root {
+    --bg: #fdfdfd;
+    --text: #222;
+    --accent: #2575fc;
+    --accent-dark: #6a11cb;
+    --code-bg: #1e1e1e;
+    --code-text: #f8f8f2;
+    --sidebar-bg: #fafafa;
+  }
+  [data-theme="dark"] {
+    --bg: #121212;
+    --text: #eaeaea;
+    --accent: #90caf9;
+    --accent-dark: #6a11cb;
+    --code-bg: #2d2d2d;
+    --code-text: #f8f8f2;
+    --sidebar-bg: #1a1a1a;
+  }
+  body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    margin: 0;
+    display: flex;
+  }
+  header {
+    background: linear-gradient(135deg, var(--accent-dark) 0%, var(--accent) 100%);
+    color: white;
+    padding: 2rem;
+    text-align: center;
+  }
+  header h1 { margin: 0; font-size: 2.2rem; }
+  #sidebar {
+    width: 280px;
+    background: var(--sidebar-bg);
+    border-right: 1px solid #4443;
+    padding: 1rem;
+    height: 100vh;
+    position: sticky;
+    top: 0;
+    overflow-y: auto;
+    flex-shrink: 0;
+  }
+  #sidebar h2 { font-size: 1rem; color: var(--accent); margin-top: 0.5rem; }
+  #sidebar ul { list-style: none; padding: 0; margin: 0.5rem 0; }
+  #sidebar li { margin: 0.25rem 0; }
+  #sidebar a {
+    text-decoration: none;
+    color: var(--text);
+    font-size: 0.9rem;
+    transition: color 0.2s;
+  }
+  #sidebar a.active { font-weight: bold; color: var(--accent); }
+  #searchBar {
+    width: 100%; padding: 0.5rem; margin-bottom: 1rem;
+    border: 1px solid #ccc; border-radius: 6px;
+    background: var(--bg); color: var(--text);
+  }
+  main {
+    flex: 1;
+    max-width: 1000px;
+    margin: 2rem auto;
+    padding: 1rem 2rem;
+    background: var(--bg);
+    border-radius: 10px;
+  }
+  .breadcrumb { font-size: 0.9rem; margin-bottom: 1rem; color: #888; }
+  .breadcrumb span { color: var(--accent); }
+  h2 {
+    border-bottom: 3px solid var(--accent);
+    padding-bottom: 0.4rem;
+    margin-top: 2rem;
+  }
+  h3 { margin-top: 1.5rem; cursor: pointer; }
+  .collapsible { margin-left: 1rem; display: none; }
+  footer {
+    text-align: center;
+    margin: 2rem 0;
+    color: #777;
+    font-size: 0.9rem;
+  }
+  code, pre {
+    background: var(--code-bg);
+    color: var(--code-text);
+    border-radius: 6px;
+    font-family: Consolas, monospace;
+  }
+  pre {
+    padding: 1rem;
+    overflow-x: auto;
+    position: relative;
+    margin: 1rem 0;
+  }
+  .copy-btn {
+    position: absolute;
+    top: 8px; right: 8px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 0.3rem 0.6rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.8rem;
+  }
+  .example {
+    background: #f0f8ff11;
+    border-left: 5px solid var(--accent);
+    padding: 1rem;
+    margin: 1rem 0;
+    border-radius: 6px;
+  }
+  #themeToggle {
+    position: absolute; top: 1rem; right: 1rem;
+    background: white; border: none;
+    border-radius: 50%; width: 36px; height: 36px;
+    cursor: pointer; font-size: 1.2rem;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  }
 </style>
 </head>
-<body>
+<body data-theme="light">
+
+<!-- Sidebar -->
+<aside id="sidebar">
+  <input type="text" id="searchBar" placeholder="Search...">
+  <nav>
+    <ul id="toc"></ul>
+  </nav>
+</aside>
+
+<!-- Main -->
+<div style="flex:1">
 <header>
-  <h1>🌿 Branch - Leaves Documentation</h1>
-  <p>Learn everything about Leaves in Branch projects, from basics to advanced tricks.</p>
+  <button id="themeToggle">🌙</button>
+  <h1>🌿 Branch Leaf Documentation</h1>
+  <p>Documentation for leaves with Branch.</p>
 </header>
 <main>
 
@@ -93,6 +211,16 @@ Search the cave | 9 | chance(90) |</code></pre>
   <p>The <code>lifetime(SECONDS)</code> condition makes a choice available for only a limited time. When the node loads, a 10-second timer starts for this choice. If the player doesn't pick it within that time, the choice will disappear. This can be combined with other conditions, like <code>has_item:torch & lifetime(5)</code>.</p>
 </div>
 
+<p>You can also use <code>!</code> before any condition to negate its result. This is a powerful shortcut for writing "not" conditions.</p>
+<div class="example">
+  <p><strong>Example:</strong></p>
+  <pre><code>Don't talk to the dragon | 2 | !has_item:Sword | </code></pre>
+  <p>This choice is only visible if the player does <strong>not</strong> have the Sword. It works the same as <code>not_has_item:Sword</code>.</p>
+  <p>You can also use it with other conditions:</p>
+  <pre><code>The safe is locked... | 5 | !hlet:4=K & !has_item:Key |</code></pre>
+  <p>This choice will appear if the fourth character of the header is not 'K' AND the player does not have a "Key" in their inventory.</p>
+</div>
+
 <h2>Actions</h2>
 <p>Actions are commands that execute when a Leaf is chosen. You can chain multiple actions together using <code>&</code> or <code>;</code>.</p>
 
@@ -107,7 +235,14 @@ Search the cave | 9 | chance(90) |</code></pre>
   <li><code>add_item:Sword</code> → Adds an item to the player's inventory.</li>
   <li><code>remove_item:Key</code> → Removes an item from the player's inventory.</li>
   <li><code>clearinv</code> → Wipes the entire inventory.</li>
+  <li><code>rename_item:OLD,NEW</code> → Changes the name of an item in the player's inventory from <code>OLD</code> to <code>NEW</code>.</li>
 </ul>
+
+<div class="example">
+  <p><strong>Renaming an Item Example:</strong></p>
+  <pre><code>You polish the sword until it shines. | 5 | | rename_item:Rusty Sword,Polished Sword</code></pre>
+  <p>If the player's inventory contains "Rusty Sword" when this option is chosen, its name will be changed to "Polished Sword".</p>
+</div>
 
 <h3>Utility Actions</h3>
 <ul>
@@ -189,12 +324,89 @@ Search the cave | 9 | chance(90) |</code></pre>
     <li><strong>Conditional Actions:</strong> <code>potions+=1;gold-=price</code> (inside the <code>&lt;...&gt;</code>) will only run if the condition is true.</li>
     <li><strong>Unconditional Action:</strong> <code>price*=2</code> (after the <code>&lt;...&gt;</code>) will <strong>always</strong> run, no matter what the condition was.</li>
   </ul>
-</div>
-
-
+</div> 
 </main>
 <footer>
-  <p>Last updated for Branch v0.5.11</p>
+  <p>Last updated for Branch v0.5.12</p>
+  <p>Documentation Version: 1.1</p>
 </footer>
+</div>
+
+<script>
+  // Theme toggle
+  const toggle = document.getElementById('themeToggle');
+  toggle.addEventListener('click', () => {
+    const body = document.body;
+    const theme = body.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+    body.setAttribute('data-theme', theme);
+    toggle.textContent = theme === 'dark' ? '☀️' : '🌙';
+  });
+
+  // TOC build
+  const toc = document.getElementById('toc');
+  document.querySelectorAll('h2, h3').forEach(el => {
+    if(!el.id) el.id = el.textContent.toLowerCase().replace(/\s+/g,'-');
+    const li = document.createElement('li');
+    const a = document.createElement('a');
+    a.textContent = el.textContent;
+    a.href = '#' + el.id;
+    li.appendChild(a);
+    if(el.tagName === 'H3') li.style.marginLeft = '1rem';
+    toc.appendChild(li);
+  });
+
+  // Scroll spy
+  const sections = document.querySelectorAll('h2, h3');
+  window.addEventListener('scroll', () => {
+    let current = '';
+    sections.forEach(sec => {
+      const top = sec.offsetTop - 100;
+      if (pageYOffset >= top) current = sec.id;
+    });
+    document.querySelectorAll('#toc a').forEach(a => {
+      a.classList.remove('active');
+      if (a.getAttribute('href') === '#' + current) a.classList.add('active');
+    });
+  });
+
+  // Search filter
+  const searchBar = document.getElementById('searchBar');
+  searchBar.addEventListener('input', () => {
+    const term = searchBar.value.toLowerCase();
+    sections.forEach(sec => {
+      if(sec.textContent.toLowerCase().includes(term)) sec.style.display = '';
+      else sec.style.display = 'none';
+    });
+  });
+
+  // Copy buttons
+  document.querySelectorAll('pre').forEach(pre => {
+    const btn = document.createElement('button');
+    btn.textContent = 'Copy';
+    btn.className = 'copy-btn';
+    pre.appendChild(btn);
+    btn.addEventListener('click', () => {
+      navigator.clipboard.writeText(pre.innerText);
+      btn.textContent = 'Copied!';
+      setTimeout(()=>btn.textContent='Copy', 1200);
+    });
+  });
+
+  // Collapsible h3 sections
+  document.querySelectorAll('h3').forEach(h3 => {
+    let next = h3.nextElementSibling;
+    const div = document.createElement('div');
+    div.classList.add('collapsible');
+    while(next && !['H2','H3'].includes(next.tagName)) {
+      const sibling = next;
+      next = next.nextElementSibling;
+      div.appendChild(sibling);
+    }
+    h3.parentNode.insertBefore(div, next);
+    h3.addEventListener('click', () => {
+      div.style.display = div.style.display === 'block' ? 'none' : 'block';
+    });
+  });
+</script>
 </body>
 </html>
