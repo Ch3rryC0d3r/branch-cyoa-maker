@@ -82,6 +82,12 @@ Search the cave | 9 | chance(90) |</code></pre>
 </div>
 
 <div class="example">
+  <p><strong>Checking a Header Character (hlet):</strong></p>
+  <pre><code>This choice is only visible if the second letter of this node's header is 'x' | 10 | hlet:2=x | </code></pre>
+  <p>The <code>hlet</code> condition (short for "header letter") checks a specific character in the current node's header string. It's case-sensitive. The index is 1-based, not 0-based.</p>
+</div>
+
+<div class="example">
   <p><strong>Timed Choice Example (lifetime):</strong></p>
   <pre><code>Quick, grab the idol! | 12 | lifetime(10) | add_item:Idol</code></pre>
   <p>The <code>lifetime(SECONDS)</code> condition makes a choice available for only a limited time. When the node loads, a 10-second timer starts for this choice. If the player doesn't pick it within that time, the choice will disappear. This can be combined with other conditions, like <code>has_item:torch & lifetime(5)</code>.</p>
@@ -105,10 +111,16 @@ Search the cave | 9 | chance(90) |</code></pre>
 
 <h3>Utility Actions</h3>
 <ul>
-  <li><code>clamp(HP:0,100)</code> → Ensures the 'HP' variable stays between 0 and 100. If HP was 110, it becomes 100. If it was -5, it becomes 0. The min/max values can be numbers or other variables.</li>
-  <li><code>consume(Key:goto:12)</code> → A shortcut action. It first checks if the player has "Key". If so, it removes "Key" from the inventory and then executes the action (<code>goto:12</code>). If the player doesn't have the item, nothing happens.</li>
+  <li><code>clamp(HP:0,100)</code> → Ensures the 'HP' variable stays between 0 and 100. If HP was 110, it becomes 100. If it was -5, it becomes 0. The min/max values can be numbers or other variables.</li>
+  <li><code>consume(Key:goto:12)</code> → A shortcut action. It first checks if the player has "Key". If so, it removes "Key" from the inventory and then executes the action (<code>goto:12</code>). If the player doesn't have the item, nothing happens.</li>
+  <li><code>rlet:INDEX:CHAR</code> → A specific action that replaces a character in the current node's header. See below for details.</li>
 </ul>
 
+<div class="example">
+  <p><strong>Replacing a Header Character (rlet):</strong></p>
+  <pre><code>Swap the second letter to 's' | 5 | | rlet:2:s</code></pre>
+  <p>The <code>rlet</code> action (short for "replace letter") changes a specific character in the current node's header string. The index is 1-based, not 0-based.</p>
+</div>
 
 <h3>Flow Control</h3>
 <ul>
@@ -179,10 +191,6 @@ Search the cave | 9 | chance(90) |</code></pre>
   </ul>
 </div>
 
-<h2>User-Defined Functions</h2>
-<p>
-  This feature allows you to define reusable blocks of actions that can be called from anywhere in your story. This is useful for creating complex, multi-step events that you need to use repeatedly without re-typing the entire action string.
-</p>
 
 </main>
 <footer>
