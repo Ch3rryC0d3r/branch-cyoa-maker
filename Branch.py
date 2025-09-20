@@ -1,12 +1,14 @@
 """ 
 Branch, a CYOA (Choose-Your-Own-Adventure) Maker.
-Version: v0.5.11
+Version: v0.5.12
 
 Changelog:
-@ v0.5.11 -
-    * Added node-level timers. Check out the Leaves Documentation to learn more.
-    * Added choice-level timers. Check out the Leaves Documentation to learn more.
+@ v0.5.12 -
+    * Added 'rlet:N:L' action and 'hlet:N=L' condition. rlet is used to replace the Nth letter in header with L, hlet is returns True or False rather or not the Nth letter in the header is L.
 
+@ v0.5.11 -
+    * Added node-level timers.
+    * Added choice-level timers.
 @ v0.5.10 - 
     * Added Chanced-Based Visibility Leaves. (learn more about it with the leaves documentation)
 
@@ -19,16 +21,14 @@ Changelog:
 @ v0.5.07 -
     * Added `clamp(VAR:MIN,MAX)` action to constrain a variable within a numeric range.
     * Added `consume(ITEM:ACTION)` shortcut to remove an item and then run an action.
-    * Updated documentation for new actions.
 
 @ v0.5.06 - 
     * Added a new flexible 'if' statement syntax: `if(cond):<conditional_actions>unconditional_actions`.
     * The colon and unconditional actions are optional, allowing for `if(cond)<conditional_actions>`.
-    * Updated documentation to reflect the new syntax.
 
 ...
 """
-VERSION = 'v0.5.11'
+VERSION = 'v0.5.12'
 
 # built-ins
 import os, re, ast, math, json, copy, random, operator, time
@@ -138,10 +138,10 @@ MIN_W, MIN_H = 30, 20 # minimum size for comments
 
 def parse_option_line(line: Union[str, Dict]) -> Optional[Dict]:
     if isinstance(line, dict):
-        return line  # already parsed, just return it
+        return line
 
     if not isinstance(line, str):
-        return None  # invalid input
+        return None
 
     raw = line.strip()
     if not raw or raw.startswith("#"):
@@ -154,23 +154,29 @@ def parse_option_line(line: Union[str, Dict]) -> Optional[Dict]:
         action = timer_match.group(2).strip()
         return {"instant": True, "timer": int(seconds), "actions": [action]}
 
-    # instant leaf (starts with @) → no text/next/cond, only actions
+    # instant leaf (starts with @)
     if raw.startswith("@"):
         return {"instant": True, "actions": [raw[1:].strip()]}
 
     parts = [p.strip() for p in raw.split("|")]
     while len(parts) < 4:
         parts.append("")
+        
     text, nxt, cond, acts = parts[0], parts[1], parts[2], parts[3]
-    # The action string should be processed by `execute_actions`, which has the
-    # necessary logic to handle complex `if` statements containing semicolons.
-    # Splitting the action string here breaks that logic by prematurely separating
-    # parts of a single `if` command.
-    # We pass the entire action string as a single item in the list.
-    actions = [acts] if acts.strip() else []
+    
+    # Correctly split the actions string by semicolons
+    actions = [a.strip() for a in re.split(r'[&;]', acts) if a.strip()]
+    
     cond = cond if cond else None
     nxt = nxt if nxt else None
-    return {"text": text, "next": nxt, "condition": cond, "actions": actions, "instant": False}
+    
+    return {
+        "text": text,
+        "next": nxt,
+        "condition": cond,
+        "actions": actions,
+        "instant": False
+    }
 
 def format_option_line(opt: Dict) -> str:
     if opt.get("instant"):
@@ -188,7 +194,7 @@ def format_option_line(opt: Dict) -> str:
     nxt = "" if opt.get("next") is None else str(opt.get("next"))
     return f"{opt.get('text','')} | {nxt} | {cond} | {acts}"
 
-def evaluate_condition(cond: Optional[str]) -> bool: # evaluate the condition 'cond' (string). Example: 'CLICKS==1' (checks if the variable 'CLICKS' is equal to 1.)
+def evaluate_condition(cond: Optional[str], current_node: Dict) -> bool:
     if not cond:
         return True
     parts = [p.strip() for p in re.split(r'[&;]', cond) if p.strip()]
@@ -204,7 +210,18 @@ def evaluate_condition(cond: Optional[str]) -> bool: # evaluate the condition 'c
                 if name in inventory:
                     return False
                 continue
-            # allow both var:EXPR and bare EXPR
+            elif part.startswith("hlet:"):
+                try:
+                    index_str, check_char = part[5:].split("=", 1)
+                    index = int(index_str.strip()) - 1
+                    current_header = current_node.get('header', '')
+                    if 0 <= index < len(current_header):
+                        if current_header[index] == check_char.strip():
+                            return True
+                    return False
+                except (ValueError, IndexError):
+                    print(f"Error: Invalid format for 'hlet' condition: {part}")
+                    return False            
             expr = part[4:].strip() if part.startswith("var:") else part
             try:
                 res = safe_eval_expr(expr, vars_store)
@@ -220,51 +237,60 @@ def evaluate_condition(cond: Optional[str]) -> bool: # evaluate the condition 'c
             return False
     return True
 
-def execute_actions(actions: List[str]):
+def execute_actions(actions: List[str], current_node: Dict):
     for act in actions:
         if not act:
             continue
-
         if act.strip().startswith('if('):
             subs = [act.strip()]
         else:
             subs = [s.strip() for s in re.split(r'[&;]', act) if s.strip()]
-
         for sub in subs:
             try:
+                # ------------------ rlet:index:new_char ------------------
+                if sub.startswith("rlet:"):
+                    try:
+                        parts = sub[5:].split(":", 1)
+                        if len(parts) == 2:
+                            index = int(parts[0].strip()) - 1
+                            new_char = parts[1].strip()
+                            current_header = current_node.get('header', '')
+                            if 0 <= index < len(current_header):
+                                new_header = current_header[:index] + new_char + current_header[index+1:]
+                                current_node['header'] = new_header
+                    except ValueError:
+                        pass
+                    continue
+                
                 # ------------------ instant @ action ------------------
                 if sub.startswith("@"):
                     instant_act = sub[1:].strip()
-                    execute_actions([instant_act])
+                    execute_actions([instant_act], current_node)
                     continue
 
                 # ------------------ if(COND):<CONDITIONAL>UNCONDITIONAL ------------------
                 m_new_if = re.match(r"^if\((.+?)\):?<(.+?)>(.*)$", sub)
                 if m_new_if:
                     cond_expr, conditional_expr, unconditional_expr = m_new_if.groups()
-                    if evaluate_condition(cond_expr.strip()):
-                        execute_actions([conditional_expr.strip()])
+                    if evaluate_condition(cond_expr.strip(), current_node):
+                        execute_actions([conditional_expr.strip()], current_node)
                     if unconditional_expr.strip():
-                        execute_actions([unconditional_expr.strip()])
+                        execute_actions([unconditional_expr.strip()], current_node)
                     continue
 
                 # ------------------ if(COND)>ACT or if(COND)>>ACTS ------------------
-                # This now correctly handles multi-step actions with '>>'
                 m_if = re.match(r"^if\((.+?)\)(>>?)(.+)$", sub)
                 if m_if:
                     cond_expr = m_if.group(1).strip()
-                    separator = m_if.group(2)  # '>' or '>>'
+                    separator = m_if.group(2)
                     act_expr = m_if.group(3).strip()
-
                     if separator == '>':
-                        # only the first action after '>' is executed
                         first_act = re.split(r'[&;]', act_expr, 1)[0].strip()
-                        if evaluate_condition(cond_expr):
-                            execute_actions([first_act])
-                    else:  # separator == '>>'
-                        # everything after '>>' is executed as a single block
-                        if evaluate_condition(cond_expr):
-                            execute_actions([act_expr])
+                        if evaluate_condition(cond_expr, current_node):
+                            execute_actions([first_act], current_node)
+                    else:
+                        if evaluate_condition(cond_expr, current_node):
+                            execute_actions([act_expr], current_node)
                     continue
 
                 # ------------------ once:ACT ------------------
@@ -273,10 +299,9 @@ def execute_actions(actions: List[str]):
                     if "__once_memory" not in vars_store:
                         vars_store["__once_memory"] = set()
                     once_mem = vars_store["__once_memory"]
-
                     if act_expr not in once_mem:
                         once_mem.add(act_expr)
-                        execute_actions([act_expr])
+                        execute_actions([act_expr], current_node)
                     continue
 
                 # ------------------ chance(CHANCE)>ACT(>ELSE) ------------------
@@ -293,9 +318,9 @@ def execute_actions(actions: List[str]):
                         chance_val = float(chance_expr) if chance_expr.replace('.','',1).isdigit() else 0
                     roll = random.uniform(0, 100)
                     if roll <= chance_val:
-                        execute_actions([act_expr])
+                        execute_actions([act_expr], current_node)
                     elif else_expr:
-                        execute_actions([else_expr])
+                        execute_actions([else_expr], current_node)
                     continue
 
                 # ------------------ repeat:TIMES>ACT ------------------
@@ -311,7 +336,7 @@ def execute_actions(actions: List[str]):
                         except:
                             times = 0
                     for _ in range(max(0, times)):
-                        execute_actions([act_expr])
+                        execute_actions([act_expr], current_node)
                     continue
 
                 # ------------------ weighted(VAR: item=weight, ...) ------------------
@@ -344,24 +369,20 @@ def execute_actions(actions: List[str]):
                     try:
                         min_val = float(safe_eval_expr(min_expr.strip(), vars_store))
                         max_val = float(safe_eval_expr(max_expr.strip(), vars_store))
-                        
                         current_val = vars_store.get(var_name)
                         if current_val is not None:
                             try:
                                 current_val_num = float(current_val)
                                 clamped_val = max(min_val, min(current_val_num, max_val))
-                                # Preserve type if original was int
                                 if isinstance(current_val, int):
                                     vars_store[var_name] = int(clamped_val)
                                 else:
                                     vars_store[var_name] = clamped_val
                             except (ValueError, TypeError):
-                                pass # Can't clamp a non-numeric value
+                                pass
                     except Exception:
-                        pass # Ignore if min/max can't be evaluated
+                        pass
                     continue
-
-                # ------------------ consume(ITEM:ACTION) ------------------
                 m_consume = re.match(r"^consume\((.+?):(.+)\)$", sub)
                 if m_consume:
                     item_name, action_expr = m_consume.groups()
@@ -369,10 +390,8 @@ def execute_actions(actions: List[str]):
                     action_expr = action_expr.strip()
                     if item_name in inventory:
                         inventory.remove(item_name)
-                        execute_actions([action_expr])
+                        execute_actions([action_expr], current_node)
                     continue
-
-                # ------------------ clearinv ------------------
                 if sub == "clearinv":
                     inventory.clear()
                     continue
@@ -482,7 +501,7 @@ def execute_actions(actions: List[str]):
             except Exception as e:
                 # You can add a print statement here to debug any unexpected action parsing errors.
                 continue
-
+            
 def resolve_next(next_ref: Union[int, str]) -> Optional[int]: # resolve the next node for options
     if isinstance(next_ref, int):
         return next_ref
@@ -1559,7 +1578,6 @@ class VisualEditor(tk.Frame):
             tk.Button(keybind_frame, text="Apply", command=save_bind).grid(row=i, column=2, sticky='e', padx=4, pady=2)
                 
     def is_valid_action(self, s: str) -> bool:
-        """Checks if a single action string is syntactically valid."""
         s = s.strip()
         if not s: return True
 
@@ -1585,7 +1603,6 @@ class VisualEditor(tk.Frame):
         return False
 
     def highlight_line_errors(self, line: str, line_num: int):
-        """Applies 'syntax_error' tags to a line for various errors."""
         stripped_line = line.strip()
         if not stripped_line or stripped_line.startswith('#'):
             return
@@ -1644,18 +1661,18 @@ class VisualEditor(tk.Frame):
         self.known_keywords = {
             'if', 'once', 'repeat', 'chance', 'weighted', 'randr', 'rands', 'goto',
             'add_item', 'remove_item', 'clearinv', 'set', 'not_has_item', 'has_item',
-            'clamp', 'consume', '$ACT' # Added $ACT keyword
+            'clamp', 'consume', '$ACT', 'rlet'
         }
         
         # Patterns for highlighting. Order matters.
         self.highlight_patterns = [
             ("syntax_comment", re.compile(r'#.*')),
             ("syntax_variable", re.compile(r'\{[A-Za-z_][A-Za-z0-9_]*\}')),
-            ("syntax_function_name_pattern", re.compile(r'&([A-Za-z_][A-Za-z0-9_]*)\(')), # New pattern for function names in calls
+            ("syntax_function_name_pattern", re.compile(r'&([A-Za-z_][A-Za-z0-9_]*)\(')),
             ("syntax_string", re.compile(r'"[^"]*"|\'[^\']*\'')),
             ("syntax_keyword", re.compile(r'\b(' + '|'.join(self.known_keywords) + r')\b')),
             ("syntax_number", re.compile(r'\b-?\d+(\.\d+)?\b')),
-            ("syntax_separator", re.compile(r'\||>>?|[:&;()]')), # Added parentheses to separators
+            ("syntax_separator", re.compile(r'\||>>?|[:&;()]')),
             ("syntax_operator", re.compile(r'[\+\-\*/]?=')),
         ]
         
@@ -2295,7 +2312,6 @@ class VisualEditor(tk.Frame):
             #messagebox.showinfo("Start node", f"Start node set to {START_NODE}")
     
     def _apply_pending_inspector_edits(self):
-        """Saves any text currently in the inspector to the selected object without redrawing."""
         if self.updating: return
         
         if self.selected_node is not None:
@@ -3137,132 +3153,134 @@ class VisualEditor(tk.Frame):
         return re.sub(r"\{(\w+)\}", repl, text)
  
     def play_render_current(self):
-        # Cancel any pending timer from the previous node
-        if hasattr(self, 'play_timer_job') and self.play_timer_job:
-            self.after_cancel(self.play_timer_job)
-            self.play_timer_job = None
+            # Cancel any pending timer from the previous node
+            if hasattr(self, 'play_timer_job') and self.play_timer_job:
+                self.after_cancel(self.play_timer_job)
+                self.play_timer_job = None
 
-        # On new node, reset lifetime timers
-        if not hasattr(self, 'last_rendered_node') or self.last_rendered_node != self.play_current:
-            if hasattr(self, 'play_lifetime_jobs'):
-                for job in self.play_lifetime_jobs:
-                    self.after_cancel(job)
-                self.play_lifetime_jobs = []
-            if hasattr(self, 'lifetime_start_times'):
-                self.lifetime_start_times = {}
-            self.last_rendered_node = self.play_current
+            # On new node, reset lifetime timers
+            if not hasattr(self, 'last_rendered_node') or self.last_rendered_node != self.play_current:
+                if hasattr(self, 'play_lifetime_jobs'):
+                    for job in self.play_lifetime_jobs:
+                        self.after_cancel(job)
+                    self.play_lifetime_jobs = []
+                if hasattr(self, 'lifetime_start_times'):
+                    self.lifetime_start_times = {}
+                self.last_rendered_node = self.play_current
 
-        # Run instant leaves (cascading gotos included)
-        self.play_current = run_instant_leaves(self.play_current)
+            # Run instant leaves (cascading gotos included)
+            self.play_current = run_instant_leaves(self.play_current)
 
-        if self.play_current not in nodes:
-            if self.settings.get('show_path', True):
-                self.play_header.config(
-                    text=f"[END] Node {self.play_current} not found. Path: {' -> '.join(map(str,self.play_path))}"
-                )
-            else:
-                self.play_header.config(text=f"[END] Node {self.play_current} not found.")
+            if self.play_current not in nodes:
+                if self.settings.get('show_path', True):
+                    self.play_header.config(
+                        text=f"[END] Node {self.play_current} not found. Path: {' -> '.join(map(str,self.play_path))}"
+                    )
+                else:
+                    self.play_header.config(text=f"[END] Node {self.play_current} not found.")
+                for w in self.choice_frame.winfo_children():
+                    w.destroy()
+                return
+
+            node = nodes[self.play_current]
+            self.play_path.append(self.play_current)
+
+            # substitute variables in header
+            self.play_header.config(text=self.substitute_vars(node.get("header", "")))
+
+            # Scan for and set up a node-level timer
+            for opt_raw in node.get("options", []):
+                opt = parse_option_line(opt_raw)
+                if opt and opt.get("instant") and "timer" in opt:
+                    seconds = opt.get("timer")
+                    actions = opt.get("actions", [])
+                    if seconds and actions:
+                        # Schedule the timer to fire after N seconds
+                        self.play_timer_job = self.after(seconds * 1000, lambda a=actions: self._execute_timed_action(a))
+                        break # Only one timer per node is supported
+
+            # Gather visible leaves
+            visible = []
+
+            # Use enumerate() to get the index of each option
+            for i, opt_raw in enumerate(node.get("options", [])):
+                opt = parse_option_line(opt_raw)
+                if not opt or opt.get("instant"):
+                    continue
+                cond_str = opt.get("condition", "") or ""
+
+                # Handle lifetime(N) condition
+                lifetime_match = re.search(r'lifetime\((\d+)\)', cond_str)
+                if lifetime_match:
+                    lifetime_seconds = int(lifetime_match.group(1))
+
+                    # Corrected: Use a tuple with the immutable index `i` as the key.
+                    key = (self.play_current, i)
+                    
+                    start_time = self.lifetime_start_times.get(key)
+                    if start_time:
+                        if time.time() - start_time >= lifetime_seconds:
+                            continue # This choice has expired
+                    else:
+                        # First time seeing this choice in this node, start its timer
+                        self.lifetime_start_times[key] = time.time()
+                        job = self.after(lifetime_seconds * 1000, self.play_render_current)
+                        self.play_lifetime_jobs.append(job)
+                    
+                    # Remove lifetime() from condition string so it's not evaluated further
+                    cond_str = cond_str[:lifetime_match.start()] + cond_str[lifetime_match.end():]
+                        
+                cond_parts = [p.strip() for p in re.split(r'[&;]', cond_str) if p.strip()]
+                
+                other_conds = []
+                chance_passed = True
+                
+                for part in cond_parts:
+                    if part.startswith('chance(') and part.endswith(')'):
+                        try:
+                            chance_val = float(part[7:-1])
+                            if random.uniform(0, 100) > chance_val:
+                                chance_passed = False
+                                break # This chance failed, no need to check others for this leaf
+                        except (ValueError, IndexError):
+                            pass # Invalid chance() syntax, treat as no condition
+                    else:
+                        other_conds.append(part)
+                
+                if not chance_passed:
+                    continue # Skip this leaf entirely
+
+                remaining_cond = " & ".join(other_conds)
+                
+                # This is the corrected line: pass 'node' as the second argument
+                if evaluate_condition(remaining_cond, node):
+                    visible.append(opt)
+
             for w in self.choice_frame.winfo_children():
                 w.destroy()
-            return
 
-        node = nodes[self.play_current]
-        self.play_path.append(self.play_current)
+            if not visible:
+                tk.Label(self.choice_frame, text="[THE END]").pack()
+                if self.settings.get('show_path', True):
+                    tk.Label(
+                        self.choice_frame,
+                        text="Path: " + " -> ".join(map(str,self.play_path))
+                    ).pack()
+                tk.Button(self.choice_frame, text="Play Again", command=self.play_restart).pack(pady=(6, 0))
+                tk.Button(self.choice_frame, text="Close Play", command=self.close_play).pack(pady=(6, 0))
+                return
 
-        # substitute variables in header
-        self.play_header.config(text=self.substitute_vars(node.get("header", "")))
-
-        # Scan for and set up a node-level timer
-        for opt_raw in node.get("options", []):
-            opt = parse_option_line(opt_raw)
-            if opt and opt.get("instant") and "timer" in opt:
-                seconds = opt.get("timer")
-                actions = opt.get("actions", [])
-                if seconds and actions:
-                    # Schedule the timer to fire after N seconds
-                    self.play_timer_job = self.after(seconds * 1000, lambda a=actions: self._execute_timed_action(a))
-                    break # Only one timer per node is supported
-
-        # Gather visible leaves
-        visible = []
-
-        # Use enumerate() to get the index of each option
-        for i, opt_raw in enumerate(node.get("options", [])):
-            opt = parse_option_line(opt_raw)
-            if not opt or opt.get("instant"):
-                continue
-            cond_str = opt.get("condition", "") or ""
-
-            # Handle lifetime(N) condition
-            lifetime_match = re.search(r'lifetime\((\d+)\)', cond_str)
-            if lifetime_match:
-                lifetime_seconds = int(lifetime_match.group(1))
-
-                # Corrected: Use a tuple with the immutable index `i` as the key.
-                key = (self.play_current, i)
-                
-                start_time = self.lifetime_start_times.get(key)
-                if start_time:
-                    if time.time() - start_time >= lifetime_seconds:
-                        continue # This choice has expired
-                else:
-                    # First time seeing this choice in this node, start its timer
-                    self.lifetime_start_times[key] = time.time()
-                    job = self.after(lifetime_seconds * 1000, self.play_render_current)
-                    self.play_lifetime_jobs.append(job)
-                
-                # Remove lifetime() from condition string so it's not evaluated further
-                cond_str = cond_str[:lifetime_match.start()] + cond_str[lifetime_match.end():]
-                    
-            cond_parts = [p.strip() for p in re.split(r'[&;]', cond_str) if p.strip()]
-            
-            other_conds = []
-            chance_passed = True
-            
-            for part in cond_parts:
-                if part.startswith('chance(') and part.endswith(')'):
-                    try:
-                        chance_val = float(part[7:-1])
-                        if random.uniform(0, 100) > chance_val:
-                            chance_passed = False
-                            break # This chance failed, no need to check others for this leaf
-                    except (ValueError, IndexError):
-                        pass # Invalid chance() syntax, treat as no condition
-                else:
-                    other_conds.append(part)
-            
-            if not chance_passed:
-                continue # Skip this leaf entirely
-
-            remaining_cond = " & ".join(other_conds)
-            if evaluate_condition(remaining_cond):
-                visible.append(opt)
-
-        for w in self.choice_frame.winfo_children():
-            w.destroy()
-
-        if not visible:
-            tk.Label(self.choice_frame, text="[THE END]").pack()
-            if self.settings.get('show_path', True):
-                tk.Label(
+            for opt in visible:
+                opt_text = self.substitute_vars(opt.get("text", "choice"))
+                btn = tk.Button(
                     self.choice_frame,
-                    text="Path: " + " -> ".join(map(str,self.play_path))
-                ).pack()
-            tk.Button(self.choice_frame, text="Play Again", command=self.play_restart).pack(pady=(6, 0))
-            tk.Button(self.choice_frame, text="Close Play", command=self.close_play).pack(pady=(6, 0))
-            return
-
-        for opt in visible:
-            opt_text = self.substitute_vars(opt.get("text", "choice"))
-            btn = tk.Button(
-                self.choice_frame,
-                text=opt_text,
-                width=50,
-                anchor="w",
-                command=lambda o=opt: self.play_pick(o)
-            )
-            btn.pack(pady=2)
-
+                    text=opt_text,
+                    width=50,
+                    anchor="w",
+                    command=lambda o=opt: self.play_pick(o)
+                )
+                btn.pack(pady=2)
+                
     def _execute_timed_action(self, actions: List[str]):
         # Ensure play window is still active
         if not hasattr(self, 'play_window') or not self.play_window.winfo_exists():
@@ -3271,6 +3289,9 @@ class VisualEditor(tk.Frame):
         self.play_timer_job = None # Clear the job reference
 
         execute_actions(actions)
+        current_node = nodes.get(self.play_current)
+        if current_node:
+            execute_actions(actions, current_node)
 
         # If the action was a 'goto', it will set a special variable.
         if "__goto" in vars_store:
@@ -3283,32 +3304,37 @@ class VisualEditor(tk.Frame):
             self.play_render_current()
 
     def play_pick(self, opt):
-        # A choice was picked, so cancel any active timer.
-        if hasattr(self, 'play_timer_job') and self.play_timer_job:
-            self.after_cancel(self.play_timer_job)
-            self.play_timer_job = None
+            # A choice was picked, so cancel any active timer.
+            if hasattr(self, 'play_timer_job') and self.play_timer_job:
+                self.after_cancel(self.play_timer_job)
+                self.play_timer_job = None
 
-        # Cancel any pending choice-level lifetime jobs
-        if hasattr(self, 'play_lifetime_jobs'):
-            for job in self.play_lifetime_jobs:
-                self.after_cancel(job)
-            self.play_lifetime_jobs = []
-            # No need to clear lifetime_start_times here, it's handled by play_render_current on node change
+            # Cancel any pending choice-level lifetime jobs
+            if hasattr(self, 'play_lifetime_jobs'):
+                for job in self.play_lifetime_jobs:
+                    self.after_cancel(job)
+                self.play_lifetime_jobs = []
+                # No need to clear lifetime_start_times here, it's handled by play_render_current on node change
 
-        execute_actions(opt.get("actions", []))
-        nxt = resolve_next(opt.get("next"))
-        if nxt is None:
-            self.play_header.config(text="[THE END]")
-            for w in self.choice_frame.winfo_children():
-                w.destroy()
-            tk.Button(self.choice_frame, text="Play Again", command=self.play_restart).pack(pady=(6,0))
-            tk.Button(self.choice_frame, text="Close Play", command=self.close_play).pack(pady=(6,0))
-            return
+            # Get the current node data
+            current_node = nodes.get(self.play_current)
+            if current_node:
+                # Execute actions associated with the chosen option, passing the current node
+                execute_actions(opt.get("actions", []), current_node)
 
-        # run instant leaves in the next node (cascading)
-        self.play_current = run_instant_leaves(nxt)
-        self.play_render_current()
+            nxt = resolve_next(opt.get("next"))
+            if nxt is None:
+                self.play_header.config(text="[THE END]")
+                for w in self.choice_frame.winfo_children():
+                    w.destroy()
+                tk.Button(self.choice_frame, text="Play Again", command=self.play_restart).pack(pady=(6,0))
+                tk.Button(self.choice_frame, text="Close Play", command=self.close_play).pack(pady=(6,0))
+                return
 
+            # run instant leaves in the next node (cascading)
+            self.play_current = run_instant_leaves(nxt)
+            self.play_render_current()
+            
     def build_example(self): # builds an example scene
         nodes.clear(); vars_store.clear(); inventory.clear()
 
