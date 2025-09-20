@@ -97,7 +97,7 @@ Examples:
 - `Explore | 2 | | play:steps.wav; delay:500; goto:3`
 - `Treasure | | | weighted(Loot, Gold=70, Gem=30)`
 
-👉 Full list of actions is documented in [Leaves Documentation](Leaves.html).
+👉 Full list of actions is documented in [Leaves Documentation](https://ch3rryc0d3r.github.io/branch-cyoa-maker/LeavesDocumentation/).
 
 ---
 
