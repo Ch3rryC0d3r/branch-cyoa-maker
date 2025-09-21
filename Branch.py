@@ -167,7 +167,7 @@ def parse_option_line(line: Union[str, Dict]) -> Optional[Dict]:
         seconds, sep, acts = timer_match.groups()
         return {
             "instant": True,
-            "timer": int(seconds),
+            "timer": float(seconds),
             "actions": [acts.strip()],
             "separator": sep
         }
@@ -3280,10 +3280,8 @@ class VisualEditor(tk.Frame):
                     sep = opt.get("separator", ">")
                     if seconds and actions:
                         # Schedule the timer to fire after N seconds
-                        self.play_timer_job = self.after(
-                            seconds * 1000,
-                            lambda a=actions, s=sep: self._execute_timed_action(a, s)
-                        )
+                        self.play_timer_job = self.after(int(seconds * 1000),
+                            lambda a=actions, s=sep: self._execute_timed_action(a, s))
                         break  # Only one timer per node is supported
 
                         # Gather visible leaves
