@@ -1,8 +1,15 @@
 """ 
 Branch, a CYOA (Choose-Your-Own-Adventure) Maker.
-Version: v0.5.12
+Version: v0.5.13
 
 Changelog:
+@ v0.5.13 -
+    * Expanded action syntax support: all [func]>[act] forms (such as repeat, once, @timer, chance, etc.) now accept '>>' and '<...>' variants, just like if-statements.
+        - '>' → Runs only the first action.
+        - '>>' → Runs all actions.
+        - ':<...>' → Runs conditional actions inside '<...>', followed by unconditional actions after.
+    * Fixed bug where '@ACT' instant actions wouldn't run due to missing argument in run_instant_leaves().
+
 @ v0.5.12 -
     * Added 'rlet:N:L' action and 'hlet:N=L' condition. rlet is used to replace the Nth letter in header with L, hlet is returns True or False rather or not the Nth letter in the header is L.
 
@@ -28,7 +35,7 @@ Changelog:
 
 ...
 """
-VERSION = 'v0.5.12'
+VERSION = 'v0.5.13'
 
 # built-ins
 import os, re, ast, math, json, copy, random, operator, time
@@ -39,6 +46,9 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, simpledialog, colorchooser
 import tkinter.font as tkFont
 import tkinter.ttk as ttk
+
+# customtkinter
+import customtkinter as ctk
 
 _ALLOWED_MATH_FUNCS = { # allowed (math) functions
     'sin': math.sin, 'cos': math.cos, 'tan': math.tan, 'sqrt': math.sqrt,
@@ -148,11 +158,16 @@ def parse_option_line(line: Union[str, Dict]) -> Optional[Dict]:
         return None
     
     # @timer(SECONDS):>ACTION leaf
-    timer_match = re.match(r"@timer\((\d+)\):>(.+)", raw)
+    timer_match = re.match(r"@timer\((\d+)\):(>>?|:)(.+)", raw)
     if timer_match:
-        seconds = timer_match.group(1)
-        action = timer_match.group(2).strip()
-        return {"instant": True, "timer": int(seconds), "actions": [action]}
+        seconds, sep, acts = timer_match.groups()
+        return {
+            "instant": True,
+            "timer": int(seconds),
+            "actions": [acts.strip()],
+            "separator": sep
+        }
+
 
     # instant leaf (starts with @)
     if raw.startswith("@"):
@@ -199,6 +214,14 @@ def evaluate_condition(cond: Optional[str], current_node: Dict) -> bool:
         return True
     parts = [p.strip() for p in re.split(r'[&;]', cond) if p.strip()]
     for part in parts:
+        is_negated = part.startswith("!")
+        if is_negated:
+            sub_cond = part[1:].strip()
+            # Recursively evaluate the sub-condition and invert the result
+            if evaluate_condition(sub_cond, current_node):
+                return False  # The sub-condition is true, so the negated condition is false
+            else:
+                continue # The sub-condition is false, so the negated condition is true        
         try:
             if part.startswith("has_item:"):
                 name = part.split(":", 1)[1].strip()
@@ -247,20 +270,33 @@ def execute_actions(actions: List[str], current_node: Dict):
             subs = [s.strip() for s in re.split(r'[&;]', act) if s.strip()]
         for sub in subs:
             try:
+                # rename_item:OLD,NEW
+                if sub.startswith("rename_item:"):
+                    try:
+                        parts = sub.split(":", 1)[1].strip().split(",", 1)
+                        if len(parts) == 2:
+                            old_name = parts[0].strip()
+                            new_name = parts[1].strip()
+                            if old_name in inventory:
+                                # Remove the old item
+                                inventory.remove(old_name)
+                                # Add the new item
+                                inventory.append(new_name)
+                    except (ValueError, IndexError):
+                        # Handle cases where the format is incorrect
+                        pass
+                    continue                    
                 # ------------------ rlet:index:new_char ------------------
                 if sub.startswith("rlet:"):
-                    try:
-                        parts = sub[5:].split(":", 1)
-                        if len(parts) == 2:
-                            index = int(parts[0].strip()) - 1
-                            new_char = parts[1].strip()
-                            current_header = current_node.get('header', '')
-                            if 0 <= index < len(current_header):
-                                new_header = current_header[:index] + new_char + current_header[index+1:]
-                                current_node['header'] = new_header
-                    except ValueError:
-                        pass
-                    continue
+                    parts = sub[5:].split(":", 1)
+                    if len(parts) == 2:
+                        index = parts[0].strip()
+                        index = safe_eval_expr(index, vars_store) - 1
+                        new_char = parts[1].strip()
+                        current_header = current_node.get('header', '')
+                        if 0 <= index < len(current_header):
+                            new_header = current_header[:index] + new_char + current_header[index+1:]
+                            current_node['header'] = new_header
                 
                 # ------------------ instant @ action ------------------
                 if sub.startswith("@"):
@@ -294,14 +330,18 @@ def execute_actions(actions: List[str], current_node: Dict):
                     continue
 
                 # ------------------ once:ACT ------------------
-                if sub.startswith("once:"):
-                    act_expr = sub.split(":", 1)[1].strip()
+                m_once = re.match(r"^once:(>>?|:)?(.+)$", sub)
+                if m_once:
+                    sep, act_expr = m_once.groups()
+                    sep = sep or ">"  # default to single
                     if "__once_memory" not in vars_store:
                         vars_store["__once_memory"] = set()
                     once_mem = vars_store["__once_memory"]
+
+                    # Use act_expr itself as the memory key
                     if act_expr not in once_mem:
                         once_mem.add(act_expr)
-                        execute_actions([act_expr], current_node)
+                        handle_action_with_separators(act_expr.strip(), sep, current_node)
                     continue
 
                 # ------------------ chance(CHANCE)>ACT(>ELSE) ------------------
@@ -323,20 +363,20 @@ def execute_actions(actions: List[str], current_node: Dict):
                         execute_actions([else_expr], current_node)
                     continue
 
-                # ------------------ repeat:TIMES>ACT ------------------
-                m_repeat = re.match(r"^repeat:(.+)>(.+)$", sub)
+                # ------------------ repeat ------------------
+                m_repeat = re.match(r"^repeat:(.+?)(>>?|:)(.+)$", sub)
                 if m_repeat:
-                    times_expr = m_repeat.group(1).strip()
-                    act_expr = m_repeat.group(2).strip()
+                    times_expr, sep, act_expr = m_repeat.groups()
                     try:
-                        times = int(safe_eval_expr(times_expr, vars_store))
+                        times = int(safe_eval_expr(times_expr.strip(), vars_store))
                     except Exception:
                         try:
-                            times = int(times_expr)
+                            times = int(times_expr.strip())
                         except:
                             times = 0
+
                     for _ in range(max(0, times)):
-                        execute_actions([act_expr], current_node)
+                        handle_action_with_separators(act_expr.strip(), sep, current_node)
                     continue
 
                 # ------------------ weighted(VAR: item=weight, ...) ------------------
@@ -499,7 +539,6 @@ def execute_actions(actions: List[str], current_node: Dict):
                         vars_store[name] = val_expr
 
             except Exception as e:
-                # You can add a print statement here to debug any unexpected action parsing errors.
                 continue
             
 def resolve_next(next_ref: Union[int, str]) -> Optional[int]: # resolve the next node for options
@@ -586,7 +625,9 @@ def run_instant_leaves(node_id: int) -> int:
                 if "timer" in opt:
                     continue
 
-                execute_actions(opt.get("actions", []))
+                sep = opt.get("separator", ">")
+                for act in opt.get("actions", []):
+                    handle_action_with_separators(act, sep, node)
                 # handle cascading goto
                 if "__goto" in vars_store:
                     nxt = resolve_next(vars_store.pop("__goto"))
@@ -597,6 +638,23 @@ def run_instant_leaves(node_id: int) -> int:
         if not changed:
             break
     return current
+
+def handle_action_with_separators(expr: str, sep: str, current_node: Dict):
+    if sep == ">":
+        first_act = re.split(r'[&;]', expr, 1)[0].strip()
+        execute_actions([first_act], current_node)
+
+    elif sep == ">>":
+        execute_actions([expr], current_node)
+
+    elif sep == ":":
+        m = re.match(r"<(.+?)>(.*)$", expr.strip())
+        if m:
+            cond_acts, uncond_acts = m.groups()
+            if evaluate_condition(cond_acts.strip(), current_node):
+                execute_actions([cond_acts.strip()], current_node)
+            if uncond_acts.strip():
+                execute_actions([uncond_acts.strip()], current_node)
 
 NODE_W = 180 # node width
 NODE_H = 80 # node height
@@ -672,6 +730,7 @@ class VisualEditor(tk.Frame):
         self.lifetime_start_times = {}
         self.last_rendered_node = None        
         self.editor_inventory_backup = None
+        self.nodes_backup = None
 
         # --- comment system state ---
         self.selected_comment = None
@@ -687,8 +746,9 @@ class VisualEditor(tk.Frame):
         self.redo_stack = []
 
         # Toolbar definition
-        self.toolbar = tk.Frame(self)
-        self.toolbar.pack(side=tk.TOP, fill=tk.X)
+        self.toolbar = ctk.CTkFrame(self, bg_color='#ffffff', fg_color='#ffffff')
+        self.toolbar.pack(side='top', fill='x')
+        self.toolbar.configure(fg_color=self.theme['inspector_bg'], bg_color=self.theme['inspector_bg'])
 
         # Font
         default_font = tkFont.nametofont("TkDefaultFont")
@@ -696,12 +756,13 @@ class VisualEditor(tk.Frame):
         self.root.option_add("*Font", default_font)
 
         # Focus Canvas
-        tk.Button(self.toolbar, text="Focus Canvas", command=self.focus_canvas).pack(side=tk.LEFT) # focuses the canvas so you can use WASD (to move around)
+        self.focus_canvas_btn = ctk.CTkButton(self.toolbar, text="Focus Canvas", command=self.focus_canvas, width=90, height=25, fg_color="gray25", hover_color="gray35")
+        self.focus_canvas_btn.pack(side="left", padx=2)
 
         # Search node input
-        self.search_var = tk.StringVar()
-        self.search_entry = tk.Entry(self.toolbar, textvariable=self.search_var, width=8)
-        self.search_entry.pack(side=tk.LEFT, padx=4)
+        self.search_var = ctk.StringVar()
+        self.search_entry = ctk.CTkEntry(self.toolbar, textvariable=self.search_var, width=120)  
+        self.search_entry.pack(side="left", padx=4)
 
         # Return (aka, enter) searches for the node if you typed a number in the search.
         self.search_entry.bind("<Return>", self.search_node)
@@ -710,20 +771,32 @@ class VisualEditor(tk.Frame):
         self.master.bind("<Control-f>", lambda e: self.search_entry.focus_set())
 
         # Play/Edit mode button
-        self.mode_button = tk.Button(self.toolbar, text="Switch to Play Mode", command=self.toggle_mode)
-        self.mode_button.pack(side=tk.RIGHT)
+        self.mode_button = ctk.CTkButton(
+            self.toolbar, 
+            text="Switch to Play Mode", 
+            command=self.toggle_mode, 
+            width=140,   # pixel width
+            height=28,   # pixel height
+            fg_color="gray25", 
+            hover_color="gray35"
+        )
+        self.mode_button.pack(side="right", padx=4)
 
         # Node Counter
-        self.node_count_label = tk.Label(self.toolbar, text="Nodes: 0")
-        self.node_count_label.pack(side=tk.RIGHT, padx=6)
+        self.node_count_label = ctk.CTkLabel(self.toolbar, text="Nodes: 0", text_color='#ffffff')
+        self.node_count_label.pack(side='right', padx=6)
 
         # default settings
         self.settings = DEFAULT_SETTINGS.copy()
         self.load_settings() # load settings if path settings.json exists
 
-        tk.Button(self.toolbar, text="Settings", command=self.open_settings).pack(side=tk.LEFT) # settings button
-        tk.Button(self.toolbar, text="Theme Control", command=self.open_themecontrol).pack(side=tk.LEFT) # theme control button
-        tk.Label(self.toolbar, text=f'{VERSION}').pack(side=tk.RIGHT)
+        self.settings_btn = ctk.CTkButton(self.toolbar, text="Settings", command=self.open_settings, width=90, height=25, fg_color="gray25", hover_color="gray35")
+        self.settings_btn.pack(side='left')
+
+        self.tc_btn = ctk.CTkButton(self.toolbar, text="Theme Control", command=self.open_themecontrol, width=90, height=25, fg_color="gray25", hover_color="gray35")
+        self.tc_btn.pack(side='left')
+
+        self.versiondisp = ctk.CTkLabel(self.toolbar, text=f'{VERSION} |', text_color='#ffffff').pack(side='right')
 
         self.menubar = tk.Menu(self.master)
         self.master.config(menu=self.menubar)
@@ -1426,41 +1499,40 @@ class VisualEditor(tk.Frame):
             self.inspector_canvas.config(bg=self.theme['inspector_canvas_bg'])
             self.title_lbl.config(bg=self.theme['title_lbl_bg'])
             self.inspector_frame.config(bg=self.theme['inspector_frame_bg'])
+            self.toolbar.configure(bg_color=self.theme['inspector_bg'], fg_color=self.theme['inspector_bg'])     
+            self.focus_canvas_btn.configure(fg_color=self.theme['inspector_bg'], text_color=self.theme['node_text_fill'], hover_color=self.theme['default_node_color'])
+            self.mode_button.configure(fg_color=self.theme['inspector_bg'], text_color=self.theme['node_text_fill'], hover_color=self.theme['default_node_color'])
+            self.settings_btn.configure(fg_color=self.theme['inspector_bg'], text_color=self.theme['node_text_fill'], hover_color=self.theme['default_node_color'])
+            self.tc_btn.configure(fg_color=self.theme['inspector_bg'], text_color=self.theme['node_text_fill'], hover_color=self.theme['default_node_color'])
+            self.search_entry.configure(fg_color=self.theme['inspector_bg'], border_color=self.theme['inspector_button_bg'], text_color=self.theme['node_text_fill'])
+            #self.versiondisp.configure(text_color=self.theme['node_text_fill'])
+            #self.node_count_label.configure(text_color=self.theme['node_text_fill'])
             self.redraw()
 
             def apply_theme_recursive(widget):
-                # background keys
-                bg_keys = [
-                    "inspector_bg", "inspector_canvas_bg", "inspector_frame_bg",
-                    "inspector_container", "inspector_body",
-                    "inspector_label_bg", "inspector_label_bg2",
-                    "inspector_header", "inspector_toggle_btn",
-                    "inspector_textbox_bg", "inspector_button_bg",
-                    "preset_canvas_bg", "preset_inner_bg", "preset_frame_bg"
-                ]
-
                 for child in widget.winfo_children():
                     # Pick a bg depending on widget type
                     if isinstance(child, tk.Label):
-                        child.config(bg=self.theme.get("inspector_label_bg", "#2e2e3e"),
+                        child.configure(bg=self.theme.get("inspector_label_bg", "#2e2e3e"),
                                     fg=self.theme.get("node_text_fill", "#ffffff"))
                     elif isinstance(child, tk.Button):
                         if child.winfo_parent() != str(self.preset_inner):
-                            child.config(bg=self.theme.get("inspector_button_bg", "#a6e3a1"))
+                            child.configure(bg=self.theme.get("inspector_button_bg", "#a6e3a1"))
                     elif isinstance(child, tk.Text):
-                        child.config(
+                        child.configure(
                             bg=self.theme.get("inspector_textbox_bg", "#f5f5f5"),
                             fg=self.theme.get("inspector_text_fg", "#000000")
                         )
                     elif isinstance(child, tk.Frame):
-                        child.config(bg=self.theme.get("inspector_body", "#313244"))
+                        child.configure(bg=self.theme.get("inspector_body", "#313244"))
                     elif isinstance(child, tk.Canvas):
-                        child.config(bg=self.theme.get("inspector_canvas_bg", "#2e2e3e"))
+                        child.configure(bg=self.theme.get("inspector_canvas_bg", "#2e2e3e"))
 
                     # Recurse
                     apply_theme_recursive(child)
 
             apply_theme_recursive(self.inspector)
+            
             if self.settings['change_node_colors']:
                 self.change_every_node_color(self.theme.get('default_node_color', '#222222'))
             
@@ -1589,6 +1661,7 @@ class VisualEditor(tk.Frame):
         if s.startswith("rands(") and s.endswith(")"): return True
         if s.startswith("clamp(") and s.endswith(")"): return True
         if s.startswith("consume(") and s.endswith(")"): return True
+        if s.startswith("rlet:"): return True
         if s == "clearinv": return True
         # Assignment: var=... var+=...
         if re.match(r"^[A-Za-z_][A-Za-z0-9_]*\s*([\+\-\*/]?=)", s): return True
@@ -1661,7 +1734,7 @@ class VisualEditor(tk.Frame):
         self.known_keywords = {
             'if', 'once', 'repeat', 'chance', 'weighted', 'randr', 'rands', 'goto',
             'add_item', 'remove_item', 'clearinv', 'set', 'not_has_item', 'has_item',
-            'clamp', 'consume', '$ACT', 'rlet'
+            'clamp', 'consume', 'rlet'
         }
         
         # Patterns for highlighting. Order matters.
@@ -1677,7 +1750,7 @@ class VisualEditor(tk.Frame):
         ]
         
         self.error_pattern = re.compile(r'\b([a-zA-Z_]+)(?=:)\b')
-        self.known_action_prefixes = {'add_item', 'remove_item', 'goto', 'once', 'repeat', 'set', 'var', 'has_item', 'not_has_item', 'weighted', 'randr', 'rands', 'clamp', 'consume'}
+        self.known_action_prefixes = {'add_item', 'remove_item', 'goto', 'once', 'repeat', 'set', 'var', 'has_item', 'not_has_item', 'weighted', 'randr', 'rands', 'clamp', 'consume', 'rlet'}
 
         # Bind events
         self.options_text.bind("<<Modified>>", self._schedule_highlight, add="+")
@@ -1738,7 +1811,7 @@ class VisualEditor(tk.Frame):
         tk.Button(self.win, text='90s', command=lambda: self.themepreset('90s', 1)).pack(side=tk.TOP, pady=4)
 
     def update_node_count(self):
-        self.node_count_label.config(text=f"Nodes: {len(self.node_rects)}")
+        self.node_count_label.configure(text=f"Nodes: {len(self.node_rects)}")
 
     def save_theme(self):
         try:
@@ -3047,9 +3120,10 @@ class VisualEditor(tk.Frame):
         self._apply_pending_inspector_edits() # Ensure globals are up-to-date with UI
         self.editor_vars_backup = copy.deepcopy(vars_store)
         self.editor_inventory_backup = inventory.copy()
+        self.nodes_backup = copy.deepcopy(nodes)
 
         self.mode = "play"
-        self.mode_button.config(text="Switch to Editor Mode")
+        self.mode_button.configure(text="Switch to Editor Mode")
         self.reset_state()
         self.play_window = tk.Toplevel(self.master)
         self.play_window.title("Play Mode")
@@ -3072,17 +3146,20 @@ class VisualEditor(tk.Frame):
         self.play_render_current()
 
     def enter_editor_mode(self): # enter editor mode
-        global vars_store, inventory
+        global vars_store, inventory, nodes
         self.mode = "editor"
-        self.mode_button.config(text="Switch to Play Mode")
+        self.mode_button.configure(text="Switch to Play Mode")
 
-        # Restore the editor's variable state from backup
+        # Restore the editor's variable state from backup and nodes incase headers have been changed
         if self.editor_vars_backup is not None:
             vars_store = self.editor_vars_backup
             self.editor_vars_backup = None
         if self.editor_inventory_backup is not None:
             inventory = self.editor_inventory_backup
             self.editor_inventory_backup = None
+        if self.nodes_backup is not None:
+            nodes = self.nodes_backup
+            self.nodes_backup = None
 
         try:
             self.play_window.destroy()
@@ -3144,7 +3221,7 @@ class VisualEditor(tk.Frame):
         self.play_current = START_NODE; self.play_path = []; self.play_render_current()
 
     @staticmethod
-    def substitute_vars(text: str) -> str: # substitute variables, used for inline variable support such as "Clicks: {CLICSKS}" ({CLICKS} gets replaced with the variable 'CLICKS' if it exists)
+    def substitute_vars(text: str) -> str: # substitute variables, used for inline variable support such as "Clicks: {CLICKS}" ({CLICKS} gets replaced with the variable 'CLICKS' if it exists)
         if not text:
             return ""
         def repl(match):
@@ -3168,7 +3245,7 @@ class VisualEditor(tk.Frame):
                     self.lifetime_start_times = {}
                 self.last_rendered_node = self.play_current
 
-            # Run instant leaves (cascading gotos included)
+            # Run instant leaves
             self.play_current = run_instant_leaves(self.play_current)
 
             if self.play_current not in nodes:
@@ -3214,7 +3291,6 @@ class VisualEditor(tk.Frame):
                 if lifetime_match:
                     lifetime_seconds = int(lifetime_match.group(1))
 
-                    # Corrected: Use a tuple with the immutable index `i` as the key.
                     key = (self.play_current, i)
                     
                     start_time = self.lifetime_start_times.get(key)
@@ -3227,7 +3303,6 @@ class VisualEditor(tk.Frame):
                         job = self.after(lifetime_seconds * 1000, self.play_render_current)
                         self.play_lifetime_jobs.append(job)
                     
-                    # Remove lifetime() from condition string so it's not evaluated further
                     cond_str = cond_str[:lifetime_match.start()] + cond_str[lifetime_match.end():]
                         
                 cond_parts = [p.strip() for p in re.split(r'[&;]', cond_str) if p.strip()]
@@ -3252,7 +3327,6 @@ class VisualEditor(tk.Frame):
 
                 remaining_cond = " & ".join(other_conds)
                 
-                # This is the corrected line: pass 'node' as the second argument
                 if evaluate_condition(remaining_cond, node):
                     visible.append(opt)
 
@@ -3260,14 +3334,22 @@ class VisualEditor(tk.Frame):
                 w.destroy()
 
             if not visible:
-                tk.Label(self.choice_frame, text="[THE END]").pack()
-                if self.settings.get('show_path', True):
-                    tk.Label(
+                ctk.CTkLabel(self.choice_frame, text="[THE END]").pack()
+
+                if self.settings.get("show_path", True):
+                    ctk.CTkLabel(
                         self.choice_frame,
-                        text="Path: " + " -> ".join(map(str,self.play_path))
+                        text="Path: " + " -> ".join(map(str, self.play_path))
                     ).pack()
-                tk.Button(self.choice_frame, text="Play Again", command=self.play_restart).pack(pady=(6, 0))
-                tk.Button(self.choice_frame, text="Close Play", command=self.close_play).pack(pady=(6, 0))
+
+                ctk.CTkButton(
+                    self.choice_frame, text="Play Again", command=self.play_restart, width=120, height=30
+                ).pack(pady=(6, 0))
+
+                ctk.CTkButton(
+                    self.choice_frame, text="Close Play", command=self.close_play, width=120, height=30
+                ).pack(pady=(6, 0))
+
                 return
 
             for opt in visible:
@@ -3358,8 +3440,8 @@ class VisualEditor(tk.Frame):
         vars_store["mysterious_path"] = 7
         self.update_node_count()
         self.redraw()
-        
-def main(): # main
+
+def main():
     root = tk.Tk()
     root.geometry("1200x700")
     app = VisualEditor(root)
