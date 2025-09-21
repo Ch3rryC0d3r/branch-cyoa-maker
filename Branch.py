@@ -1,418 +1,3459 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Branch Documentation</title>
-<style>
-  :root {
-    --bg: #fdfdfd;
-    --text: #222;
-    --accent: #2575fc;
-    --accent-dark: #6a11cb;
-    --code-bg: #1e1e1e;
-    --code-text: #f8f8f2;
-    --sidebar-bg: #fafafa;
-  }
-  [data-theme="dark"] {
-    --bg: #121212;
-    --text: #eaeaea;
-    --accent: #90caf9;
-    --accent-dark: #6a11cb;
-    --code-bg: #2d2d2d;
-    --code-text: #f8f8f2;
-    --sidebar-bg: #1a1a1a;
-  }
-  body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    margin: 0;
-    display: flex;
-  }
-  header {
-    background: linear-gradient(135deg, var(--accent-dark) 0%, var(--accent) 100%);
-    color: white;
-    padding: 2rem;
-    text-align: center;
-  }
-  header h1 { margin: 0; font-size: 2.2rem; }
-  #sidebar {
-    width: 280px;
-    background: var(--sidebar-bg);
-    border-right: 1px solid #4443;
-    padding: 1rem;
-    height: 100vh;
-    position: sticky;
-    top: 0;
-    overflow-y: auto;
-    flex-shrink: 0;
-  }
-  #sidebar h2 { font-size: 1rem; color: var(--accent); margin-top: 0.5rem; }
-  #sidebar ul { list-style: none; padding: 0; margin: 0.5rem 0; }
-  #sidebar li { margin: 0.25rem 0; }
-  #sidebar a {
-    text-decoration: none;
-    color: var(--text);
-    font-size: 0.9rem;
-    transition: color 0.2s;
-  }
-  #sidebar a.active { font-weight: bold; color: var(--accent); }
-  #searchBar {
-    width: 100%; padding: 0.5rem; margin-bottom: 1rem;
-    border: 1px solid #ccc; border-radius: 6px;
-    background: var(--bg); color: var(--text);
-  }
-  main {
-    flex: 1;
-    max-width: 1000px;
-    margin: 2rem auto;
-    padding: 1rem 2rem;
-    background: var(--bg);
-    border-radius: 10px;
-  }
-  .breadcrumb { font-size: 0.9rem; margin-bottom: 1rem; color: #888; }
-  .breadcrumb span { color: var(--accent); }
-  h2 {
-    border-bottom: 3px solid var(--accent);
-    padding-bottom: 0.4rem;
-    margin-top: 2rem;
-  }
-  h3 { margin-top: 1.5rem; cursor: pointer; }
-  .collapsible { margin-left: 1rem; display: none; }
-  footer {
-    text-align: center;
-    margin: 2rem 0;
-    color: #777;
-    font-size: 0.9rem;
-  }
-  code, pre {
-    background: var(--code-bg);
-    color: var(--code-text);
-    border-radius: 6px;
-    font-family: Consolas, monospace;
-  }
-  pre {
-    padding: 1rem;
-    overflow-x: auto;
-    position: relative;
-    margin: 1rem 0;
-  }
-  .copy-btn {
-    position: absolute;
-    top: 8px; right: 8px;
-    background: var(--accent);
-    color: white;
-    border: none;
-    padding: 0.3rem 0.6rem;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 0.8rem;
-  }
-  .example {
-    background: #f0f8ff11;
-    border-left: 5px solid var(--accent);
-    padding: 1rem;
-    margin: 1rem 0;
-    border-radius: 6px;
-  }
-  #themeToggle {
-    position: absolute; top: 1rem; right: 1rem;
-    background: white; border: none;
-    border-radius: 50%; width: 36px; height: 36px;
-    cursor: pointer; font-size: 1.2rem;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
-  }
-</style>
-</head>
-<body data-theme="light">
+""" 
+Branch, a CYOA (Choose-Your-Own-Adventure) Maker.
+Version: v0.5.14
 
-<!-- Sidebar -->
-<aside id="sidebar">
-  <input type="text" id="searchBar" placeholder="Search...">
-  <nav>
-    <ul id="toc"></ul>
-  </nav>
-</aside>
+Changelog:
+@ v0.5.14 -
+    * Bugfixes (@timer fix)
+    * @timer now allows decimal seconds such as "@timer(0.1)"
 
-<!-- Main -->
-<div style="flex:1">
-<header>
-  <button id="themeToggle">🌙</button>
-  <h1>🌿 Branch Leaf Documentation</h1>
-  <p>Documentation for leaves with Branch.</p>
-</header>
-<main>
+@ v0.5.13 -
+    * Expanded action syntax support: all [func]>[act] forms (such as repeat, once, @timer, chance, etc.) now accept '>>' and '<...>' variants, just like if-statements.
+        - '>' → Runs only the first action.
+        - '>>' → Runs all actions.
+        - ':<...>' → Runs conditional actions inside '<...>', followed by unconditional actions after.
+    * Fixed bug where '@ACT' instant actions wouldn't run due to missing argument in run_instant_leaves().
 
-<h2>What is a Leaf?</h2>
-<p>A <strong>Leaf</strong> is a single option line inside a Node. It's what players can pick. Each Leaf can:</p>
-<ul>
-  <li>Show <strong>Text</strong> for the choice.</li>
-  <li>Point to another Node (<strong>Next</strong>).</li>
-  <li>Check <strong>Conditions</strong> for display.</li>
-  <li>Execute <strong>Actions</strong> when chosen.</li>
-</ul>
+@ v0.5.12 -
+    * Added 'rlet:N:L' action and 'hlet:N=L' condition. rlet is used to replace the Nth letter in header with L, hlet is returns True or False rather or not the Nth letter in the header is L.
 
-<h2>Leaf Structure</h2>
-<p>Leaves are written as:</p>
-<pre><code>Text | Next | Condition | Actions</code></pre>
+@ v0.5.11 -
+    * Added node-level timers.
+    * Added choice-level timers.
+@ v0.5.10 - 
+    * Added Chanced-Based Visibility Leaves. (learn more about it with the leaves documentation)
 
-<ul>
-  <li><strong>Text</strong> → What the player sees (supports <code>{var}</code> substitution).</li>
-  <li><strong>Next</strong> → The Node ID to go to (can be a single ID, random from a list like <code>1/2/3</code>, or a variable).</li>
-  <li><strong>Condition</strong> → Optional checks that must be true for the Leaf to be visible.</li>
-  <li><strong>Actions</strong> → Things that happen when the player chooses this Leaf.</li>
-</ul>
+@ v0.5.09 -
+    * In the node-right-click-menu, added a "Change ID" button.
 
-<div class="example">
-  <p><strong>Simple Example:</strong></p>
-  <pre><code>Take the sword | 5 | has_item:Key | add_item:Sword</code></pre>
-</div>
+@ v0.5.08 - 
+    * Fixed "Variables & Inventory" to be default variable values, as intended.
 
-<h2>Comments</h2>
-<p>You can add comments to your Leaf options to leave notes for yourself or to temporarily disable a line. The game engine will ignore any line that starts with a hash symbol (<code>#</code>).</p>
-<div class="example">
-  <p><strong>Example with comments:</strong></p>
-  <pre><code># This is a choice to go left.
-Go left | 2 | | 
-Go right | 3 | | 
-# TODO: Add a condition for this secret path later
-# A secret path | 4 | has_item:key | </code></pre>
-</div>
+@ v0.5.07 -
+    * Added `clamp(VAR:MIN,MAX)` action to constrain a variable within a numeric range.
+    * Added `consume(ITEM:ACTION)` shortcut to remove an item and then run an action.
 
-<h2>Conditions</h2>
-<p>Conditions control whether a Leaf is visible to the player. You can chain multiple conditions together using <code>&</code> or <code>;</code>. All conditions must be true for the Leaf to appear.</p>
-<ul>
-  <li><code>has_item:Sword</code> → Checks if the player has the "Sword" item.</li>
-  <li><code>not_has_item:Key</code> → Checks if the player does <strong>not</strong> have the "Key" item.</li>
-  <li><code>HP &lt;= 0</code> → Allows for complex mathematical and boolean checks using variables.</li>
-  <li><code>var:CLICKS==1</code> → An explicit way to check a variable's value (the <code>var:</code> prefix is optional).</li>
-</ul>
+@ v0.5.06 - 
+    * Added a new flexible 'if' statement syntax: `if(cond):<conditional_actions>unconditional_actions`.
+    * The colon and unconditional actions are optional, allowing for `if(cond)<conditional_actions>`.
 
-<div class="example">
-  <p><strong>Chance-Based Visibility Example:</strong></p>
-  <pre><code>Search the forest | 8 | chance(40) |  
-Search the cave | 9 | chance(90) |</code></pre>
-  <p>In this node, "Search the forest" has a 40% chance to be visible, and "Search the cave" has a 90% chance to be visible. It's possible for both, one, or neither to appear.
-  This is different from the <code>weighted()</code> <em>action</em>, which picks one outcome from a pool.
-  You can mix this with other conditions, for example: <code>has_item:torch & chance(50)</code>. The leaf will only be visible if the player has a torch AND the 50% chance roll succeeds.
-  </p>
-</div>
+...
+"""
+VERSION = 'v0.5.14'
 
-<div class="example">
-  <p><strong>Checking a Header Character (hlet):</strong></p>
-  <pre><code>This choice is only visible if the second letter of this node's header is 'x' | 10 | hlet:2=x | </code></pre>
-  <p>The <code>hlet</code> condition (short for "header letter") checks a specific character in the current node's header string. It's case-sensitive. The index is 1-based, not 0-based.</p>
-</div>
+# built-ins
+import os, re, ast, math, json, copy, random, operator, time
+from typing import Any, Dict, List, Optional, Tuple, Union
 
-<div class="example">
-  <p><strong>Timed Choice Example (lifetime):</strong></p>
-  <pre><code>Quick, grab the idol! | 12 | lifetime(10) | add_item:Idol</code></pre>
-  <p>The <code>lifetime(SECONDS)</code> condition makes a choice available for only a limited time. When the node loads, a 10-second timer starts for this choice. If the player doesn't pick it within that time, the choice will disappear. This can be combined with other conditions, like <code>has_item:torch & lifetime(5)</code>.</p>
-</div>
+# tkinter
+import tkinter as tk
+from tkinter import filedialog, messagebox, simpledialog, colorchooser
+import tkinter.font as tkFont
+import tkinter.ttk as ttk
 
-<p>You can also use <code>!</code> before any condition to negate its result. This is a powerful shortcut for writing "not" conditions.</p>
-<div class="example">
-  <p><strong>Example:</strong></p>
-  <pre><code>Don't talk to the dragon | 2 | !has_item:Sword | </code></pre>
-  <p>This choice is only visible if the player does <strong>not</strong> have the Sword. It works the same as <code>not_has_item:Sword</code>.</p>
-  <p>You can also use it with other conditions:</p>
-  <pre><code>The safe is locked... | 5 | !hlet:4=K & !has_item:Key |</code></pre>
-  <p>This choice will appear if the fourth character of the header is not 'K' AND the player does not have a "Key" in their inventory.</p>
-</div>
+# customtkinter
+import customtkinter as ctk
 
-<h2>Actions</h2>
-<p>Actions are commands that execute when a Leaf is chosen. You can chain multiple actions together using <code>&</code> or <code>;</code>.</p>
+_ALLOWED_MATH_FUNCS = { # allowed (math) functions
+    'sin': math.sin, 'cos': math.cos, 'tan': math.tan, 'sqrt': math.sqrt,
+    'abs': abs, 'min': min, 'max': max, 'round': round, 'int': int, 'float': float
+}
+_ALLOWED_OPERATORS = { # allowed (math) operators
+    ast.Add: operator.add,
+    ast.Sub: operator.sub,
+    ast.Mult: operator.mul,
+    ast.Div: operator.truediv,
+    ast.Pow: operator.pow,
+    ast.Mod: operator.mod,
+    ast.USub: operator.neg,
+    ast.UAdd: operator.pos,
+    ast.FloorDiv: operator.floordiv,
+}
 
-<h3>Variables</h3>
-<ul>
-  <li><code>gold = 100</code> → Assigns a value to a variable.</li>
-  <li><code>gold += 5</code> → Modifies a variable's value (also supports <code>-=</code>, <code>*=</code>, <code>/=</code>).</li>
-</ul>
+def safe_eval_expr(expr: str, names: dict): # evaluates an expression safely
+    expr = expr.strip()
+    if not expr:
+        return None
 
-<h3>Inventory</h3>
-<ul>
-  <li><code>add_item:Sword</code> → Adds an item to the player's inventory.</li>
-  <li><code>remove_item:Key</code> → Removes an item from the player's inventory.</li>
-  <li><code>clearinv</code> → Wipes the entire inventory.</li>
-  <li><code>rename_item:OLD,NEW</code> → Changes the name of an item in the player's inventory from <code>OLD</code> to <code>NEW</code>.</li>
-</ul>
+    # parse
+    node = ast.parse(expr, mode='eval')
 
-<div class="example">
-  <p><strong>Renaming an Item Example:</strong></p>
-  <pre><code>You polish the sword until it shines. | 5 | | rename_item:Rusty Sword,Polished Sword</code></pre>
-  <p>If the player's inventory contains "Rusty Sword" when this option is chosen, its name will be changed to "Polished Sword".</p>
-</div>
+    def _eval(n):
+        if isinstance(n, ast.Expression):
+            return _eval(n.body)
+        if isinstance(n, ast.Constant): # for newer py (users)
+            return n.value
+        if isinstance(n, ast.BinOp):
+            left = _eval(n.left)
+            right = _eval(n.right)
+            op = type(n.op)
+            if op in _ALLOWED_OPERATORS:
+                return _ALLOWED_OPERATORS[op](left, right)
+            raise ValueError(f"Operator {op} not allowed")
+        if isinstance(n, ast.UnaryOp):
+            operand = _eval(n.operand)
+            op = type(n.op)
+            if op in _ALLOWED_OPERATORS:
+                return _ALLOWED_OPERATORS[op](operand)
+            raise ValueError(f"Unary operator {op} not allowed")
+        if isinstance(n, ast.Name):
+            # allow names from provided names dict
+            if n.id in names:
+                return names[n.id]
+            # allow numeric-looking strings? No - return 0 or raise
+            raise ValueError(f"Name '{n.id}' not defined")
+        if isinstance(n, ast.Call):
+            # only allow simple function calls (no attribute calls)
+            if isinstance(n.func, ast.Name):
+                fname = n.func.id
+                if fname in _ALLOWED_MATH_FUNCS:
+                    args = [_eval(a) for a in n.args]
+                    return _ALLOWED_MATH_FUNCS[fname](*args)
+            raise ValueError("Function calls not allowed or not whitelisted")
+        if isinstance(n, ast.Compare):
+            left = _eval(n.left)
+            results = []
+            for op, comparator in zip(n.ops, n.comparators):
+                right = _eval(comparator)
+                if isinstance(op, ast.Eq):
+                    results.append(left == right)
+                elif isinstance(op, ast.NotEq):
+                    results.append(left != right)
+                elif isinstance(op, ast.Gt):
+                    results.append(left > right)
+                elif isinstance(op, ast.GtE):
+                    results.append(left >= right)
+                elif isinstance(op, ast.Lt):
+                    results.append(left < right)
+                elif isinstance(op, ast.LtE):
+                    results.append(left <= right)
+                else:
+                    raise ValueError("Comparison operator not allowed")
+                left = right
+            return all(results)
+        raise ValueError(f"Unsupported AST: {type(n)}")
 
-<h3>Utility Actions</h3>
-<ul>
-  <li><code>clamp(HP:0,100)</code> → Ensures the 'HP' variable stays between 0 and 100. If HP was 110, it becomes 100. If it was -5, it becomes 0. The min/max values can be numbers or other variables.</li>
-  <li><code>consume(Key:goto:12)</code> → A shortcut action. It first checks if the player has "Key". If so, it removes "Key" from the inventory and then executes the action (<code>goto:12</code>). If the player doesn't have the item, nothing happens.</li>
-  <li><code>rlet:INDEX:CHAR</code> → A specific action that replaces a character in the current node's header. See below for details.</li>
-</ul>
+    ret = _eval(node)
+    return ret
 
-<div class="example">
-  <p><strong>Replacing a Header Character (rlet):</strong></p>
-  <pre><code>Swap the second letter to 's' | 5 | | rlet:2:s</code></pre>
-  <p>The <code>rlet</code> action (short for "replace letter") changes a specific character in the current node's header string. The index is 1-based, not 0-based.</p>
-</div>
+# dictionaries and whatnot
+nodes: Dict[int, Dict] = {}
+comments = {}
+vars_store: Dict[str, Any] = {} # variable storage
+inventory: List[str] = [] # inventory list
+# constants
+START_NODE = 1 # default start node
+BASE_FONT_SIZE = 11 # font size
+SETTINGS_PATH = "./settings.json" # path for 'settings.json' (saves your in-app settings on exit)
+THEME_PATH = "./theme.json" # path for 'theme.json' (saves your in-app theme on exit)
+MIN_W, MIN_H = 30, 20 # minimum size for comments
 
-<h3>Flow Control</h3>
-<ul>
-  <li><code>once:gold+=1</code> → Runs this action only once ever.</li>
-  <li><code>once:&gt;gold+=1</code> → Runs only the first action once.</li>
-  <li><code>once:&gt;&gt;gold+=1;log:done</code> → Runs all actions, but only once total.</li>
-  <li><code>once:&lt;gold+=1&gt;log:done</code> → Conditional gold increase (if condition true), but log always, only the first time.</li>
-</ul>
+# A "LEAF" (it doesn't matter if it's uppercased) is simply a name for an option line in the Node Inspector.
 
-<h3>Randomization</h3>
-<ul>
-  <li><code>randr(damage:5,20)</code> → Sets the 'damage' variable to a random number between 5 and 20.</li>
-  <li><code>rands(weather:Sunny,Cloudy)</code> → Sets the 'weather' variable to either "Sunny" or "Cloudy".</li>
-  <li><code>weighted(weather:Sunny=70,Rain=30)</code> → Sets 'weather' based on weights. "Sunny" has a 70% chance, "Rain" has a 30% chance.</li>
-  <li><code>chance(30)&gt;gold+=10</code> → A 30% chance to execute the success action (<code>gold+=10</code>).</li>
-  <li><code>chance(30)&gt;gold+=10&gt;gold-=5</code> → A 30% chance for success (<code>gold+=10</code>), otherwise the fail action (<code>gold-=5</code>) is executed.</li>
-</ul>
+def parse_option_line(line: Union[str, Dict]) -> Optional[Dict]:
+    if isinstance(line, dict):
+        return line
 
-<h3>Loops</h3>
-<ul>
-  <li><code>repeat:3&gt;gold+=1</code> → Repeats the <em>first</em> action (<code>gold+=1</code>) 3 times.</li>
-  <li><code>repeat:3&gt;&gt;gold+=1;log:done</code> → Repeats <em>all</em> actions 3 times.</li>
-  <li><code>repeat:3:&lt;gold+=1&gt;log:done</code> → Adds gold if the condition is true, but always logs.</li>
-</ul>
+    if not isinstance(line, str):
+        return None
 
-<h3>Instant Actions (@)</h3>
-<p>Instant actions are special actions that run automatically when a player enters a node, <em>before</em> they get to make a choice. They are defined on their own line, starting with <code>@</code>.</p>
-<pre><code>@HP-=5
-@if(is_cursed)&gt;add_item:Curse</code></pre>
+    raw = line.strip()
+    if not raw or raw.startswith("#"):
+        return None
+    
+    # @timer
+    timer_match = re.match(r"@timer\((\d+(?:\.\d+)?)\):(>>?|:)(.+)", raw)
+    if timer_match:
+        seconds, sep, acts = timer_match.groups()
+        return {
+            "instant": True,
+            "timer": int(seconds),
+            "actions": [acts.strip()],
+            "separator": sep
+        }
 
-<h3>Timed Instant Actions (@timer)</h3>
-<p>A special type of instant action that executes after a delay. Supports the same separators as <code>if</code> and <code>repeat</code>.</p>
-<pre><code>@timer(SECONDS):&gt;ACTION
-@timer(SECONDS):&gt;&gt;ACTION1;ACTION2
-@timer(SECONDS):&lt;CACTS&gt;UACTS</code></pre>
-<ul>
-  <li><strong>&gt;</strong> → Only runs the first action after the timer expires.</li>
-  <li><strong>&gt;&gt;</strong> → Runs all actions after the timer expires.</li>
-  <li><strong>&lt;...&gt;</strong> → Conditional actions inside the block, unconditional actions outside it.</li>
-</ul>
-<div class="example">
-  <p><strong>Example:</strong></p>
-  <pre><code>@timer(5):&gt;&gt;goto:10;HP-=5</code></pre>
-  <p>After 5 seconds, the player is sent to Node 10 and loses 5 HP.</p>
-</div>
 
-<h2>Conditional Actions (if)</h2>
-<p>The <code>if</code> statement is a powerful action that lets you run other actions only if a certain condition is met. It has a few different forms.</p>
 
-<h3>1. Single Conditional Action (&gt;)</h3>
-<p>This is the simplest form. If the condition is true, it executes only the <strong>first</strong> action that follows the <code>&gt;</code>.</p>
-<div class="example">
-  <pre><code>if(has_item:Sword)&gt;damage+=10;cost=50</code></pre>
-  <p>In this case, if the player has a sword, <code>damage</code> will increase by 10. The <code>cost=50</code> action is <strong>not</strong> part of the if-statement and will always run.</p>
-</div>
 
-<h3>2. Multi-Action Block (&gt;&gt;)</h3>
-<p>By using <code>&gt;&gt;</code>, you can tell the if-statement to treat <strong>all</strong> subsequent actions on the line as a single conditional block.</p>
-<div class="example">
-  <pre><code>if(gold&gt;=price)&gt;&gt;potions+=1;gold-=price</code></pre>
-  <p>Here, if <code>gold</code> is greater than or equal to <code>price</code>, <strong>both</strong> actions (<code>potions+=1</code> and <code>gold-=price</code>) will be executed.</p>
-</div>
+    # instant leaf (starts with @)
+    if raw.startswith("@"):
+        return {"instant": True, "actions": [raw[1:].strip()]}
 
-<h3>3. Advanced Conditional/Unconditional Block (&lt;...&gt;)</h3>
-<p>This is the most flexible syntax. It allows you to define a block of actions that run if the condition is true, followed by actions that run regardless.</p>
-<pre><code>if(condition):&lt;conditional_actions&gt;unconditional_actions</code></pre>
-<div class="example">
-  <pre><code>if(gold&gt;=price):&lt;potions+=1;gold-=price&gt;price*=2</code></pre>
-  <p>Let's break it down:</p>
-  <ul>
-    <li><strong>Condition:</strong> <code>gold&gt;=price</code></li>
-    <li><strong>Conditional Actions:</strong> <code>potions+=1;gold-=price</code> (inside the <code>&lt;...&gt;</code>) will only run if the condition is true.</li>
-    <li><strong>Unconditional Action:</strong> <code>price*=2</code> (after the <code>&lt;...&gt;</code>) will <strong>always</strong> run, no matter what the condition was.</li>
-  </ul>
-</div> 
-</main>
-<footer>
-  <p>Last updated for Branch v0.5.14</p>
-  <p>Documentation Version: 1.1</p>
-</footer>
-</div>
-
-<script>
-  // Theme toggle
-  const toggle = document.getElementById('themeToggle');
-  toggle.addEventListener('click', () => {
-    const body = document.body;
-    const theme = body.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
-    body.setAttribute('data-theme', theme);
-    toggle.textContent = theme === 'dark' ? '☀️' : '🌙';
-  });
-
-  // TOC build
-  const toc = document.getElementById('toc');
-  document.querySelectorAll('h2, h3').forEach(el => {
-    if(!el.id) el.id = el.textContent.toLowerCase().replace(/\s+/g,'-');
-    const li = document.createElement('li');
-    const a = document.createElement('a');
-    a.textContent = el.textContent;
-    a.href = '#' + el.id;
-    li.appendChild(a);
-    if(el.tagName === 'H3') li.style.marginLeft = '1rem';
-    toc.appendChild(li);
-  });
-
-  // Scroll spy
-  const sections = document.querySelectorAll('h2, h3');
-  window.addEventListener('scroll', () => {
-    let current = '';
-    sections.forEach(sec => {
-      const top = sec.offsetTop - 100;
-      if (pageYOffset >= top) current = sec.id;
-    });
-    document.querySelectorAll('#toc a').forEach(a => {
-      a.classList.remove('active');
-      if (a.getAttribute('href') === '#' + current) a.classList.add('active');
-    });
-  });
-
-  // Search filter
-  const searchBar = document.getElementById('searchBar');
-  searchBar.addEventListener('input', () => {
-    const term = searchBar.value.toLowerCase();
-    sections.forEach(sec => {
-      if(sec.textContent.toLowerCase().includes(term)) sec.style.display = '';
-      else sec.style.display = 'none';
-    });
-  });
-
-  // Copy buttons
-  document.querySelectorAll('pre').forEach(pre => {
-    const btn = document.createElement('button');
-    btn.textContent = 'Copy';
-    btn.className = 'copy-btn';
-    pre.appendChild(btn);
-    btn.addEventListener('click', () => {
-      navigator.clipboard.writeText(pre.innerText);
-      btn.textContent = 'Copied!';
-      setTimeout(()=>btn.textContent='Copy', 1200);
-    });
-  });
-
-  // Collapsible h3 sections
-  document.querySelectorAll('h3').forEach(h3 => {
-    let next = h3.nextElementSibling;
-    const div = document.createElement('div');
-    div.classList.add('collapsible');
-    while(next && !['H2','H3'].includes(next.tagName)) {
-      const sibling = next;
-      next = next.nextElementSibling;
-      div.appendChild(sibling);
+    parts = [p.strip() for p in raw.split("|")]
+    while len(parts) < 4:
+        parts.append("")
+        
+    text, nxt, cond, acts = parts[0], parts[1], parts[2], parts[3]
+    
+    # Correctly split the actions string by semicolons
+    actions = [a.strip() for a in re.split(r'[&;]', acts) if a.strip()]
+    
+    cond = cond if cond else None
+    nxt = nxt if nxt else None
+    
+    return {
+        "text": text,
+        "next": nxt,
+        "condition": cond,
+        "actions": actions,
+        "instant": False
     }
-    h3.parentNode.insertBefore(div, next);
-    h3.addEventListener('click', () => {
-      div.style.display = div.style.display === 'block' ? 'none' : 'block';
-    });
-  });
-</script>
-</body>
-</html>
+
+def format_option_line(opt: Dict) -> str:
+    if opt.get("instant"):
+        # Handle timed instant leaves
+        if "timer" in opt:
+            seconds = opt.get("timer")
+            action = ";".join(opt.get("actions", []))
+            return f"@timer({seconds}):>{action}"
+        # For instant leaves, prepend '@' to the first action
+        acts = ";".join(opt.get("actions", []))
+        return f"@{acts}" if acts else "@"
+    
+    acts = ";".join(opt.get("actions", [])) if opt.get("actions") else ""
+    cond = opt.get("condition") or ""
+    nxt = "" if opt.get("next") is None else str(opt.get("next"))
+    return f"{opt.get('text','')} | {nxt} | {cond} | {acts}"
+
+def evaluate_condition(cond: Optional[str], current_node: Dict) -> bool:
+    if not cond:
+        return True
+    parts = [p.strip() for p in re.split(r'[&;]', cond) if p.strip()]
+    for part in parts:
+        is_negated = part.startswith("!")
+        if is_negated:
+            sub_cond = part[1:].strip()
+            # Recursively evaluate the sub-condition and invert the result
+            if evaluate_condition(sub_cond, current_node):
+                return False  # The sub-condition is true, so the negated condition is false
+            else:
+                continue # The sub-condition is false, so the negated condition is true        
+        try:
+            if part.startswith("has_item:"):
+                name = part.split(":", 1)[1].strip()
+                if name not in inventory:
+                    return False
+                continue
+            if part.startswith("not_has_item:"):
+                name = part.split(":", 1)[1].strip()
+                if name in inventory:
+                    return False
+                continue
+            elif part.startswith("hlet:"):
+                try:
+                    index_str, check_char = part[5:].split("=", 1)
+                    index = int(index_str.strip()) - 1
+                    current_header = current_node.get('header', '')
+                    if 0 <= index < len(current_header):
+                        if current_header[index] == check_char.strip():
+                            return True
+                    return False
+                except (ValueError, IndexError):
+                    print(f"Error: Invalid format for 'hlet' condition: {part}")
+                    return False            
+            expr = part[4:].strip() if part.startswith("var:") else part
+            try:
+                res = safe_eval_expr(expr, vars_store)
+            except Exception:
+                return False
+            if isinstance(res, bool):
+                if not res:
+                    return False
+            else:
+                if not res:
+                    return False
+        except Exception:
+            return False
+    return True
+
+def execute_actions(actions: List[str], current_node: Dict):
+    for act in actions:
+        if not act:
+            continue
+        if act.strip().startswith('if('):
+            subs = [act.strip()]
+        else:
+            subs = [s.strip() for s in re.split(r'[&;]', act) if s.strip()]
+        for sub in subs:
+            try:
+                # rename_item:OLD,NEW
+                if sub.startswith("rename_item:"):
+                    try:
+                        parts = sub.split(":", 1)[1].strip().split(",", 1)
+                        if len(parts) == 2:
+                            old_name = parts[0].strip()
+                            new_name = parts[1].strip()
+                            if old_name in inventory:
+                                # Remove the old item
+                                inventory.remove(old_name)
+                                # Add the new item
+                                inventory.append(new_name)
+                    except (ValueError, IndexError):
+                        # Handle cases where the format is incorrect
+                        pass
+                    continue                    
+                # ------------------ rlet:index:new_char ------------------
+                if sub.startswith("rlet:"):
+                    parts = sub[5:].split(":", 1)
+                    if len(parts) == 2:
+                        index = parts[0].strip()
+                        index = safe_eval_expr(index, vars_store) - 1
+                        new_char = parts[1].strip()
+                        current_header = current_node.get('header', '')
+                        if 0 <= index < len(current_header):
+                            new_header = current_header[:index] + new_char + current_header[index+1:]
+                            current_node['header'] = new_header
+                
+                # ------------------ instant @ action ------------------
+                if sub.startswith("@"):
+                    instant_act = sub[1:].strip()
+                    execute_actions([instant_act], current_node)
+                    continue
+
+                # ------------------ if(COND):<CONDITIONAL>UNCONDITIONAL ------------------
+                m_new_if = re.match(r"^if\((.+?)\):?<(.+?)>(.*)$", sub)
+                if m_new_if:
+                    cond_expr, conditional_expr, unconditional_expr = m_new_if.groups()
+                    if evaluate_condition(cond_expr.strip(), current_node):
+                        execute_actions([conditional_expr.strip()], current_node)
+                    if unconditional_expr.strip():
+                        execute_actions([unconditional_expr.strip()], current_node)
+                    continue
+
+                # ------------------ if(COND)>ACT or if(COND)>>ACTS ------------------
+                m_if = re.match(r"^if\((.+?)\)(>>?)(.+)$", sub)
+                if m_if:
+                    cond_expr = m_if.group(1).strip()
+                    separator = m_if.group(2)
+                    act_expr = m_if.group(3).strip()
+                    if separator == '>':
+                        first_act = re.split(r'[&;]', act_expr, 1)[0].strip()
+                        if evaluate_condition(cond_expr, current_node):
+                            execute_actions([first_act], current_node)
+                    else:
+                        if evaluate_condition(cond_expr, current_node):
+                            execute_actions([act_expr], current_node)
+                    continue
+
+                # ------------------ once:ACT ------------------
+                m_once = re.match(r"^once:(>>?|:)?(.+)$", sub)
+                if m_once:
+                    sep, act_expr = m_once.groups()
+                    sep = sep or ">"  # default to single
+                    if "__once_memory" not in vars_store:
+                        vars_store["__once_memory"] = set()
+                    once_mem = vars_store["__once_memory"]
+
+                    # Use act_expr itself as the memory key
+                    if act_expr not in once_mem:
+                        once_mem.add(act_expr)
+                        handle_action_with_separators(act_expr.strip(), sep, current_node)
+                    continue
+
+                # ------------------ chance(CHANCE)>ACT(>ELSE) ------------------
+                m_chance = re.match(r"^chance\((.+)\)>(.+?)(?:>(.+))?$", sub)
+                if m_chance:
+                    chance_expr, act_expr, else_expr = (
+                        m_chance.group(1).strip(),
+                        m_chance.group(2).strip(),
+                        m_chance.group(3).strip() if m_chance.group(3) else None
+                    )
+                    try:
+                        chance_val = float(safe_eval_expr(chance_expr, vars_store))
+                    except Exception:
+                        chance_val = float(chance_expr) if chance_expr.replace('.','',1).isdigit() else 0
+                    roll = random.uniform(0, 100)
+                    if roll <= chance_val:
+                        execute_actions([act_expr], current_node)
+                    elif else_expr:
+                        execute_actions([else_expr], current_node)
+                    continue
+
+                # ------------------ repeat ------------------
+                m_repeat = re.match(r"^repeat:(.+?)(>>?|:)(.+)$", sub)
+                if m_repeat:
+                    times_expr, sep, act_expr = m_repeat.groups()
+                    try:
+                        times = int(safe_eval_expr(times_expr.strip(), vars_store))
+                    except Exception:
+                        try:
+                            times = int(times_expr.strip())
+                        except:
+                            times = 0
+
+                    for _ in range(max(0, times)):
+                        handle_action_with_separators(act_expr.strip(), sep, current_node)
+                    continue
+
+                # ------------------ weighted(VAR: item=weight, ...) ------------------
+                if sub.startswith("weighted(") and sub.endswith(")"):
+                    payload = sub[9:-1].strip()
+                    if ":" in payload:
+                        varname, items = payload.split(":", 1)
+                        varname = varname.strip()
+                        choices, weights = [], []
+                        for pair in items.split(","):
+                            if "=" in pair:
+                                item, weight = pair.split("=", 1)
+                                item, weight = item.strip(), weight.strip()
+                                try:
+                                    w = float(safe_eval_expr(weight, vars_store))
+                                except Exception:
+                                    try: w = float(weight)
+                                    except: w = 1.0
+                                choices.append(item)
+                                weights.append(w)
+                        if choices and weights:
+                            vars_store[varname] = random.choices(choices, weights=weights, k=1)[0]
+                    continue
+
+                # ------------------ clamp(VAR:MIN,MAX) ------------------
+                m_clamp = re.match(r"^clamp\((.+?):(.+?),(.+?)\)$", sub)
+                if m_clamp:
+                    var_name, min_expr, max_expr = m_clamp.groups()
+                    var_name = var_name.strip()
+                    try:
+                        min_val = float(safe_eval_expr(min_expr.strip(), vars_store))
+                        max_val = float(safe_eval_expr(max_expr.strip(), vars_store))
+                        current_val = vars_store.get(var_name)
+                        if current_val is not None:
+                            try:
+                                current_val_num = float(current_val)
+                                clamped_val = max(min_val, min(current_val_num, max_val))
+                                if isinstance(current_val, int):
+                                    vars_store[var_name] = int(clamped_val)
+                                else:
+                                    vars_store[var_name] = clamped_val
+                            except (ValueError, TypeError):
+                                pass
+                    except Exception:
+                        pass
+                    continue
+                m_consume = re.match(r"^consume\((.+?):(.+)\)$", sub)
+                if m_consume:
+                    item_name, action_expr = m_consume.groups()
+                    item_name = item_name.strip()
+                    action_expr = action_expr.strip()
+                    if item_name in inventory:
+                        inventory.remove(item_name)
+                        execute_actions([action_expr], current_node)
+                    continue
+                if sub == "clearinv":
+                    inventory.clear()
+                    continue
+
+                # ------------------ assignment without var: (X=5, Y+=2, etc) ------------------
+                m_var = re.match(r"^([A-Za-z_][A-Za-z0-9_]*)\s*([\+\-\*/]?=)\s*(.+)$", sub)
+                if m_var:
+                    name, op, rhs = m_var.group(1), m_var.group(2), m_var.group(3)
+                    try:
+                        rhs_val = safe_eval_expr(rhs, vars_store)
+                    except Exception:
+                        rhs_val = rhs.strip('"').strip("'")
+                        try: rhs_val = int(rhs_val)
+                        except:
+                            try: rhs_val = float(rhs_val)
+                            except: pass
+                    cur = vars_store.get(name, 0)
+                    if op == "=":
+                        vars_store[name] = rhs_val
+                    elif op == "+=":
+                        try: vars_store[name] = (cur or 0) + rhs_val
+                        except: vars_store[name] = rhs_val
+                    elif op == "-=":
+                        try: vars_store[name] = (cur or 0) - rhs_val
+                        except: vars_store[name] = cur
+                    elif op == "*=":
+                        try: vars_store[name] = (cur or 0) * rhs_val
+                        except: vars_store[name] = cur
+                    elif op == "/=":
+                        try: vars_store[name] = (cur or 0) / rhs_val
+                        except: vars_store[name] = cur
+                    continue
+
+                # add_item/remove_item
+                if sub.startswith("add_item:"):
+                    name = sub.split(":",1)[1].strip()
+                    if name and name not in inventory:
+                        inventory.append(name)
+                    continue
+
+                if sub.startswith("remove_item:"):
+                    name = sub.split(":",1)[1].strip()
+                    if name in inventory:
+                        inventory.remove(name)
+                    continue
+
+                # goto:target
+                if sub.startswith("goto:"):
+                    vars_store["__goto"] = sub.split(":",1)[1].strip()
+                    continue
+
+                # randr(variable: min, max)
+                if sub.startswith("randr(") and sub.endswith(")"):
+                    payload = sub[6:-1].strip()
+                    if ":" in payload and "," in payload:
+                        varname, range_vals = payload.split(":", 1)
+                        varname = varname.strip()
+                        try:
+                            min_val, max_val = [float(v.strip()) for v in range_vals.split(",", 1)]
+                            vars_store[varname] = random.uniform(min_val, max_val)
+                        except Exception:
+                            continue
+                    continue
+
+                # rands(variable: item1, item2, ...)
+                if sub.startswith("rands(") and sub.endswith(")"):
+                    payload = sub[6:-1].strip()
+                    if ":" in payload:
+                        varname, items = payload.split(":", 1)
+                        varname = varname.strip()
+                        choices = [i.strip() for i in re.split(r'[,/]', items) if i.strip()]
+                        if choices:
+                            vars_store[varname] = random.choice(choices)
+                    continue
+
+                # set:variable=value (legacy)
+                if sub.startswith("set:"):
+                    payload = sub.split(":", 1)[1]
+                    if "=" not in payload:
+                        continue
+                    name, raw = payload.split("=", 1)
+                    name, raw = name.strip(), raw.strip()
+                    try:
+                        val = safe_eval_expr(raw, vars_store)
+                    except Exception:
+                        if raw.lower() == "true":
+                            val = True
+                        elif raw.lower() == "false":
+                            val = False
+                        else:
+                            try: val = int(raw)
+                            except:
+                                try: val = float(raw)
+                                except: val = raw.strip('"').strip("'")
+                    vars_store[name] = val
+                    continue
+
+                # fallback: generic name=val
+                if "=" in sub:
+                    name, val_expr = sub.split("=",1)
+                    name, val_expr = name.strip(), val_expr.strip()
+                    try:
+                        vars_store[name] = safe_eval_expr(val_expr, vars_store)
+                    except Exception:
+                        vars_store[name] = val_expr
+
+            except Exception as e:
+                continue
+            
+def resolve_next(next_ref: Union[int, str]) -> Optional[int]: # resolve the next node for options
+    if isinstance(next_ref, int):
+        return next_ref
+    if isinstance(next_ref, str):
+        s = next_ref.strip()
+        if not s:
+            return None
+
+        if "/" in s:
+            choices = [part.strip() for part in s.split("/") if part.strip()]
+            resolved = []
+            for c in choices:
+                try:
+                    resolved.append(int(c))
+                except Exception:
+                    val = vars_store.get(c)
+                    try:
+                        resolved.append(int(val))
+                    except Exception:
+                        try:
+                            # try evaluating expression
+                            ev = safe_eval_expr(c, vars_store)
+                            resolved.append(int(ev))
+                        except Exception:
+                            continue
+            if not resolved:
+                return None
+            return random.choice(resolved)
+        else:
+            try:
+                return int(s)
+            except Exception:
+                val = vars_store.get(s)
+                try:
+                    return int(val)
+                except Exception:
+                    try:
+                        ev = safe_eval_expr(s, vars_store)
+                        return int(ev)
+                    except Exception:
+                        return None
+    return None
+
+def create_node(num: int, header: str = "", x: int = 50, y: int = 50, options: Optional[List[Dict]] = None, color: str = '#222222'): # self-explanatory: creates a node
+    nodes[num] = {"header": header, "options": options or [], "x": x, "y": y, "color": color}
+
+def delete_node(num: int): # deletes node with node id of 'num' (int)
+    if num in nodes:
+        del nodes[num]
+    
+def list_nodes() -> List[int]: # lists nodes, pretty self-explanatory
+    return sorted(nodes.keys())
+
+def find_dead_ends() -> List[Tuple[int, Dict]]: # finds dead ends in nodes
+    bad = []
+    for nid, data in nodes.items():
+        for opt in data["options"]:
+            if opt.get("next") is None or opt.get("next") == "":
+                continue
+            if resolve_next(opt.get("next")) is None:
+                bad.append((nid, opt))
+    return bad
+
+def run_instant_leaves(node_id: int) -> int:
+    current = node_id
+    while True:
+        node = nodes.get(current)
+        if not node:
+            return current
+        changed = False
+        for opt_raw in node.get("options", []):
+            # parse if it's a string
+            if isinstance(opt_raw, str):
+                opt = parse_option_line(opt_raw)
+            elif isinstance(opt_raw, dict):
+                opt = opt_raw
+            else:
+                continue
+
+            if opt and opt.get("instant"):
+                # Timer leaves are handled by the play loop, not here.
+                if "timer" in opt:
+                    continue
+
+                sep = opt.get("separator", ">")
+                for act in opt.get("actions", []):
+                    handle_action_with_separators(act, sep, node)
+                # handle cascading goto
+                if "__goto" in vars_store:
+                    nxt = resolve_next(vars_store.pop("__goto"))
+                    if nxt is not None and nxt != current:
+                        current = nxt
+                        changed = True
+                        break  # restart processing instant leaves in new node
+        if not changed:
+            break
+    return current
+
+def handle_action_with_separators(expr: str, sep: str, current_node: Dict):
+    if sep == ">":
+        first_act = re.split(r'[&;]', expr, 1)[0].strip()
+        execute_actions([first_act], current_node)
+
+    elif sep == ">>":
+        execute_actions([expr], current_node)
+
+    elif sep == ":":
+        m = re.match(r"<(.+?)>(.*)$", expr.strip())
+        if m:
+            cond_acts, uncond_acts = m.groups()
+            if evaluate_condition(cond_acts.strip(), current_node):
+                execute_actions([cond_acts.strip()], current_node)
+            if uncond_acts.strip():
+                execute_actions([uncond_acts.strip()], current_node)
+
+NODE_W = 180 # node width
+NODE_H = 80 # node height
+COMMENT_W, COMMENT_H = 150, 50 # comment width, comment height
+HANDLE_SIZE = 8  # size of draggable corner handles on comments
+DEFAULT_SETTINGS = {
+    "disable_delete_confirm": False,
+    "show_path": False,
+    "udtdnc": False,
+    "change_node_colors": False,
+    "keybinds": {
+        "undo": "<Control-z>",
+        "redo": "<Control-Shift-Z>",
+        "redo_alt": "<Control-y>",
+        "save": "<Control-s>"
+    },
+    "default_comment_w": 150,
+    "default_comment_h": 50,
+    'disable_text_truncation': False
+}
+
+class VisualEditor(tk.Frame):
+    def make_collapsible_section(self, parent, title): # makes a collpasible section, such as what you see in the Node Inspector.
+        container = tk.Frame(parent, bg=self.theme['inspector_container'])
+        
+        header = tk.Frame(container, bg=self.theme['inspector_header'])
+        header.pack(fill=tk.X)
+
+        label = tk.Label(header, text=title, bg=self.theme['inspector_label_bg2'],
+                        font=("TkDefaultFont", 10, "bold"))
+        label.pack(side=tk.LEFT, padx=4)
+
+        
+        toggle_btn = tk.Button(header, text="-", width=2,
+                            relief="flat", bg=self.theme['inspector_toggle_btn'])
+        toggle_btn.pack(side=tk.LEFT, padx=2)   
+
+        
+        body = tk.Frame(container, bg=self.theme['inspector_body'])
+        body.pack(fill=tk.X)
+
+        def toggle():
+            if body.winfo_ismapped():
+                body.forget()
+                toggle_btn.config(text="+")
+            else:
+                body.pack(fill=tk.X)
+                toggle_btn.config(text="-")
+
+        toggle_btn.config(command=toggle)
+
+        return container, body
+
+    def __init__(self, master): # init
+        self.root = master
+        super().__init__(master)
+        self.master.title("Branch -- Visual CYOA Editor") # title
+        self.pack(fill=tk.BOTH, expand=True)
+        self.mode = "editor" # initalize mode
+        self.selected_node: Optional[int] = None
+        self.dragging = False
+        self.drag_offset = (0,0)
+        self.node_base_fonts: Dict[int, tkFont.Font] = {}  
+        self.current_zoom = 1.0 # all zoom features are commented out due to bugs that will be worked on in the future.
+        self.multi_select_rect = None
+        self.multi_selected_nodes = set() # set of multi selected nodes
+        self.undo_stack = [] # undo stack, or 'undo list'
+        self._highlight_job = None # For debouncing syntax highlighting
+        self.theme = {} # define 'self.theme' for later use
+        self.editor_vars_backup = None
+        self.play_timer_job = None
+        self.play_lifetime_jobs = []
+        self.lifetime_start_times = {}
+        self.last_rendered_node = None        
+        self.editor_inventory_backup = None
+        self.nodes_backup = None
+
+        # --- comment system state ---
+        self.selected_comment = None
+        self.resizing_comment = False
+        self.comment_rects = {}
+        self.comment_texts = {}
+        
+        # load theme.json if existing, otherwise, load 'default' theme.
+        if not os.path.exists(THEME_PATH):
+            self.themepreset('default')
+        else:
+            self.load_theme()          
+        self.redo_stack = []
+
+        # Toolbar definition
+        self.toolbar = ctk.CTkFrame(self, bg_color='#ffffff', fg_color='#ffffff')
+        self.toolbar.pack(side='top', fill='x')
+        self.toolbar.configure(fg_color=self.theme['inspector_bg'], bg_color=self.theme['inspector_bg'])
+
+        # Font
+        default_font = tkFont.nametofont("TkDefaultFont")
+        default_font.configure(family="Segoe UI", size=10)
+        self.root.option_add("*Font", default_font)
+
+        # Focus Canvas
+        self.focus_canvas_btn = ctk.CTkButton(self.toolbar, text="Focus Canvas", command=self.focus_canvas, width=90, height=25, fg_color="gray25", hover_color="gray35")
+        self.focus_canvas_btn.pack(side="left", padx=2)
+
+        # Search node input
+        self.search_var = ctk.StringVar()
+        self.search_entry = ctk.CTkEntry(self.toolbar, textvariable=self.search_var, width=120)  
+        self.search_entry.pack(side="left", padx=4)
+
+        # Return (aka, enter) searches for the node if you typed a number in the search.
+        self.search_entry.bind("<Return>", self.search_node)
+
+        # Ctrl+F Bind = Find Node
+        self.master.bind("<Control-f>", lambda e: self.search_entry.focus_set())
+
+        # Play/Edit mode button
+        self.mode_button = ctk.CTkButton(
+            self.toolbar, 
+            text="Switch to Play Mode", 
+            command=self.toggle_mode, 
+            width=140,   # pixel width
+            height=28,   # pixel height
+            fg_color="gray25", 
+            hover_color="gray35"
+        )
+        self.mode_button.pack(side="right", padx=4)
+
+        # Node Counter
+        self.node_count_label = ctk.CTkLabel(self.toolbar, text="Nodes: 0", text_color='#ffffff')
+        self.node_count_label.pack(side='right', padx=6)
+
+        # default settings
+        self.settings = DEFAULT_SETTINGS.copy()
+        self.load_settings() # load settings if path settings.json exists
+
+        self.settings_btn = ctk.CTkButton(self.toolbar, text="Settings", command=self.open_settings, width=90, height=25, fg_color="gray25", hover_color="gray35")
+        self.settings_btn.pack(side='left')
+
+        self.tc_btn = ctk.CTkButton(self.toolbar, text="Theme Control", command=self.open_themecontrol, width=90, height=25, fg_color="gray25", hover_color="gray35")
+        self.tc_btn.pack(side='left')
+
+        self.versiondisp = ctk.CTkLabel(self.toolbar, text=f'{VERSION} |', text_color='#ffffff').pack(side='right')
+
+        self.menubar = tk.Menu(self.master)
+        self.master.config(menu=self.menubar)
+        self.master.protocol("WM_DELETE_WINDOW", self.on_exit)
+
+        # App Menu
+        self.app_menu = tk.Menu(self.menubar, tearoff=0)
+        self.menubar.add_cascade(label="App", menu=self.app_menu)
+        self.apply_keybinds()
+        self.app_menu.add_command(label="Undo (Ctrl+Z)", command=self.undo)
+        self.app_menu.add_command(label="Redo (Ctrl+Shift+Z / Ctrl+Y)", command=self.redo)
+        self.app_menu.add_separator()
+        self.app_menu.add_command(label="Clear all saves", command=self.clear_all_saves)
+        self.app_menu.add_command(label="Save (Ctrl+S)", command=self.save_story_dialog)
+        self.app_menu.add_command(label="Load", command=self.load_story_dialog)
+        self.app_menu.add_separator()
+        self.app_menu.add_command(label="Quit", command=self.master.quit)
+        self.app_menu.add_separator()
+        self.app_menu.add_command(label="Clear all nodes.", command=self.reset_all)
+         
+        self.paned = ttk.PanedWindow(self, orient=tk.HORIZONTAL)
+        self.paned.pack(fill=tk.BOTH, expand=True)
+
+        # Canvas Frame Definition
+        canvas_frame = tk.Frame(self.paned)
+        self.canvas = tk.Canvas(canvas_frame, bg='#101010', width=900, height=600,
+                                scrollregion=(-100000,-100000,100000,100000))
+        self.canvas.pack(fill=tk.BOTH, expand=True)
+
+        # Setup Controls
+        self.setup_controls()
+
+        # Node Menu (right clicking on a node)
+        self.node_menu = tk.Menu(self.canvas, tearoff=0)
+        self.node_menu.add_command(label="Delete Node", command=self.delete_selected_node)
+
+        # Inspector Frame Definition
+        self.inspector_frame = tk.Frame(self.paned, bg="#dcdcdc", width=100)
+        self.inspector_frame.pack_propagate(False)  
+
+        # Inspector Canvas Defintion
+        self.inspector_canvas = tk.Canvas(self.inspector_frame, bg="#dcdcdc", highlightthickness=0)
+        self.inspector_canvas.pack(side="left", fill="both", expand=True)
+
+        # Inspector Definition
+        self.inspector = tk.Frame(self.inspector_canvas, bg="#dcdcdc")
+        self.inspector_canvas.create_window((0, 0), window=self.inspector, anchor="nw")
+
+        # Make canvas_frame and self.inspector_frame a paned frame
+        self.paned.add(canvas_frame)       
+        self.paned.add(self.inspector_frame)  
+
+        def set_default_sash(event=None):
+            total = self.paned.winfo_width()
+            if total > 500:
+                self.paned.sashpos(0, total - 400)  
+            else:
+                self.paned.sashpos(0, total // 2)
+        self.after_idle(set_default_sash)
+
+        # Node Inspector
+        self.master.bind("<Configure>", set_default_sash)
+        self.title_lbl = tk.Label(self.inspector, text="Node Inspector", font=("TkDefaultFont", 12, "bold"), bg=self.theme['inspector_label_bg'])
+        self.title_lbl.pack(anchor="w", pady=(8, 4))
+        
+        # ***************************Node Info Section***************************
+        node_sec, node_body = self.make_collapsible_section(self.inspector, "Node Info")
+        node_sec.pack(fill="x", expand=False, pady=(4,0))
+        # ID Label
+        self.id_label = tk.Label(node_body, text="ID: -", bg=self.theme['inspector_label_bg'])
+        self.id_label.pack(anchor="w")
+        # Header stuff
+        tk.Label(node_body, width=10, text="Header:", bg=self.theme['inspector_label_bg']).pack(anchor="w")
+        self.header_text = tk.Text(
+            node_body,
+            height=3,
+            wrap="word",  # wrap properly at words
+            bg=self.theme['inspector_textbox_bg']
+        )
+        self.header_text.pack(fill="x", expand=True, padx=4, pady=2)  # let it expand horizontally
+
+        # ***************************Options Section***************************
+        opt_sec, opt_body = self.make_collapsible_section(self.inspector, "Options")
+        opt_sec.pack(fill=tk.X, pady=(4,0))
+        tk.Label(opt_body, text="text | next | condition | actions", bg=self.theme['inspector_label_bg']).pack(anchor="w")
+        self.options_text = tk.Text(opt_body, height=8, wrap="word", bg=self.theme['inspector_textbox_bg'])
+        self.options_text.pack(fill="x", expand=True, padx=4, pady=2)
+        tk.Button(opt_body, text="Set as Start Node", command=self.set_start_node, bg=self.theme['inspector_button_bg']).pack(anchor="w", pady=(6,0))
+       
+        # ***************************Variables and Inventory section.***************************
+        vars_sec, vars_body = self.make_collapsible_section(self.inspector, "Variables & Inventory")
+        vars_sec.pack(fill=tk.X, pady=(4,0))
+
+        # Vars List
+        self.vars_list = tk.Text(vars_body, height=5, wrap="word", bg=self.theme['inspector_textbox_bg'])
+        self.vars_list.pack(fill="x", expand=True, padx=4, pady=2)
+
+        def sync_text_width(event):
+            text_widget = event.widget
+            # get current width of the frame in pixels
+            width_px = text_widget.winfo_width()
+            # convert pixels > approx characters (roughly)
+            char_width = text_widget.winfo_fpixels("1c")
+            new_width = max(int(width_px / char_width), 1)
+            text_widget.config(width=new_width)
+
+        self.header_text.bind("<Configure>", sync_text_width)
+        self.options_text.bind("<Configure>", sync_text_width)
+        self.vars_list.bind("<Configure>", sync_text_width)
+
+        # ***************************Color Section***************************        
+        color_sec, color_body = self.make_collapsible_section(self.inspector, "Colors")
+        color_sec.pack(fill=tk.X, pady=(4,0))
+
+        # Pick Node Color (you can pick any color on Tkinters' default 'colorchooser' for the currently selected node)
+        tk.Button(color_body, text="Pick Node Color", command=self.pick_node_color, bg=self.theme['inspector_button_bg']).pack(anchor="w", pady=(4,0))
+        # Node Color Presets
+        preset_frame = tk.Frame(color_body, bg=self.theme['preset_frame_bg'])
+        preset_frame.pack(anchor="w", pady=(4,0))
+        tk.Label(preset_frame, text="Presets:", bg=self.theme['inspector_label_bg']).pack(side=tk.LEFT)
+        preset_canvas = tk.Canvas(preset_frame, height=30, width=300, bg=self.theme['preset_canvas_bg'])
+        h_scroll = tk.Scrollbar(preset_frame, orient=tk.HORIZONTAL, command=preset_canvas.xview, bg=self.theme['preset_canvas_bg'])
+        preset_canvas.configure(xscrollcommand=h_scroll.set, bg=self.theme['preset_canvas_bg'])
+        h_scroll.pack(side=tk.BOTTOM, fill=tk.X)
+        preset_canvas.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        self.preset_inner = tk.Frame(preset_canvas, bg=self.theme['preset_inner_bg'])
+        preset_canvas.create_window((0,0), window=self.preset_inner, anchor='nw')
+        self.color_presets = [
+            "#e6194B","#f58231","#ffe119","#bfef45","#3cb44b","#42d4f4","#4363d8",
+            "#911eb4","#f032e6","#a9a9a9","#555555","#222222","#ffffff"
+        ]
+        for c in self.color_presets:
+            btn = tk.Button(self.preset_inner, bg=c, width=2,
+                            command=lambda col=c: self.apply_preset_color(col))
+            btn.pack(side=tk.LEFT, padx=1)
+        self.preset_inner.update_idletasks()
+        preset_canvas.config(scrollregion=preset_canvas.bbox("all"))
+
+        # Canvas Keybinds
+        self.canvas.bind("<ButtonPress-2>", self.start_pan)
+        self.canvas.bind("<B2-Motion>", self.do_pan)
+        self.canvas.tag_bind("node", "<Button-3>", self.node_right_click)
+        self.canvas.bind("<Shift-ButtonPress-1>", self.multi_select_start)
+        self.canvas.bind("<Shift-B1-Motion>", self.multi_select_drag)
+        self.canvas.bind("<Shift-ButtonRelease-1>", self.multi_select_end)
+        self.canvas.bind("<ButtonPress-1>", self.start_resize, add="+")
+        self.canvas.bind("<B1-Motion>", self.do_resize, add="+")
+        self.canvas.bind("<ButtonRelease-1>", self.stop_resize, add="+")
+        self.canvas.tag_bind("comment", "<Button-3>", self.comment_right_click)
+        self.canvas.bind("<ButtonPress-1>", self.start_canvas_or_comment, add="+")  # move comments
+        self.canvas.bind("<ButtonPress-1>", self.canvas_mouse_down, add="+")        # move nodes
+        self.canvas.bind("<B1-Motion>", self.canvas_mouse_move, add="+")
+        self.canvas.bind("<ButtonRelease-1>", self.canvas_mouse_up, add="+")
+
+        # Auto-application stuff
+        self.updating = False
+        self.header_text.bind("<<Modified>>", self._on_modified)
+        self.vars_list.bind("<<Modified>>", self._on_modified)
+
+        self.header_text.bind("<FocusOut>", self._on_focus_out)
+        self.options_text.bind("<FocusOut>", self._on_focus_out)
+        self.vars_list.bind("<FocusOut>", self._on_focus_out)
+
+        # Background Right Click Menu
+        self.bg_menu = tk.Menu(self.canvas, tearoff=0)
+        self.bg_menu.add_command(label="(Quick) Add Node", command=lambda: self.quick_add_node())
+        self.bg_menu.add_command(label="(Specific ID) Add Node", command=self.add_node_prompt)  
+        self.bg_menu.add_command(label="Add Comment", command=self.add_comment_prompt) 
+        self.canvas.bind("<Button-3>", self.background_right_click)
+
+        # Define nodes and edges initally
+        self.node_rects: Dict[int, int] = {}
+        self.node_texts: Dict[int, int] = {}
+        self.edge_items: List[int] = []
+
+        # Load theme.json if the path exists, otherwise, load 'default' theme.
+        if not os.path.exists(THEME_PATH):
+            self.themepreset('default')
+        else:
+            self.load_theme()
+
+        # Configure syntax highlighting
+        self._configure_syntax_highlighting()
+
+        # Build an example
+        self.build_example()
+
+        # Draw everything
+        self.redraw()
+        
+        # Update the node count
+        self.update_node_count()
+
+        # Master binds
+        self.master.bind("<Control-z>", lambda e: self.undo())
+        self.master.bind("<Control-Shift-Z>", lambda e: self.redo())
+        self.master.bind("<Control-y>", lambda e: self.redo())
+
+    def apply_comment_text(self):
+        if self.selected_comment is None:
+            return
+        new_text = self.header_text.get("1.0", tk.END).strip()
+        comments[self.selected_comment]["text"] = new_text
+        self.redraw()
+
+    def start_canvas_or_comment(self, event):
+        x, y = self.canvas.canvasx(event.x), self.canvas.canvasy(event.y)
+        self.moving_comment = None
+        for cid, data in comments.items():
+            w, h = data.get("w", COMMENT_W), data.get("h", COMMENT_H)
+            if data["x"] <= x <= data["x"] + w and data["y"] <= y <= data["y"] + h:
+                self.moving_comment = cid
+                self.comment_drag_start = (x, y)
+                self.comment_orig_pos = (data["x"], data["y"])
+                break
+
+    def move_comment(self, event):
+        if self.moving_comment is None:
+            return
+        cid = self.moving_comment
+        data = comments[cid]
+        x, y = self.canvas.canvasx(event.x), self.canvas.canvasy(event.y)
+        dx = x - self.comment_drag_start[0]
+        dy = y - self.comment_drag_start[1]
+        orig_x, orig_y = self.comment_orig_pos
+        data["x"] = orig_x + dx
+        data["y"] = orig_y + dy
+        self.redraw()
+
+    def stop_moving_comment(self, event):
+        self.moving_comment = None
+
+    def _on_modified(self, event):
+        if self.updating:
+            event.widget.edit_modified(False)
+            return
+        w = event.widget
+        if w.edit_modified():
+            if w is self.header_text:
+                if self.selected_comment is not None:
+                    self.apply_comment_edits()
+                elif self.selected_node is not None:
+                    self.apply_edits()
+            elif w is self.vars_list:
+                self.apply_vars_text()
+            w.edit_modified(False)
+
+    def _on_focus_out(self, event):
+        if self.selected_comment is not None:
+            self.apply_comment_edits()
+        elif self.selected_node is not None:
+            self.apply_edits()
+        self.apply_vars_text()
+
+    def change_every_node_color(self, color: str):
+        self.push_undo()
+        targets = nodes
+        for nid in targets:
+            if nid is not None:
+                nodes[nid]["color"] = color
+        self.redraw()        
+
+    def themepreset(self, preset: str, changetype=None):
+        if preset:
+            if preset == 'default':
+                self.theme = { 
+                    "canvas_background": "#1e1e2e", 
+                    "from_lines": "#89dceb", 
+                    "to_lines": "#f38ba8",
+                    "randomEdgeFromColor": "#fab387",
+
+                    "default_node_color": "#313244",
+                    "node_outline": "#585b70",
+                    "node_selected_outline": "#fab387",
+                    "multi_selected_outline": "#f9e2af",
+                    "node_text_fill": "#f5f5f5",
+
+                    "inspector_bg": "#2e2e3e",
+                    "inspector_canvas_bg": "#2e2e3e",
+                    "title_lbl_bg": "#2e2e3e",
+                    "inspector_frame_bg": "#2e2e3e",
+                    "inspector_container": "#313244",
+                    "inspector_body": "#313244",
+                    "inspector_label_bg": "#313244",
+                    "inspector_label_bg2": "#45475a",
+                    "inspector_header": "#45475a",
+                    "inspector_toggle_btn": "#45475a",
+                    "inspector_textbox_bg": "#f5f5f5",
+                    "inspector_button_bg": "#a6e3a1",
+
+                    "syntax_keyword": "#c586c0", # magenta
+                    "syntax_comment": "#6A9955",
+                    "syntax_string": "#ce9178",
+                    "syntax_number": "#b5cea8",
+                    "syntax_variable": "#9cdcfe",
+                    "syntax_separator": "#888888",
+                    "syntax_operator": "#888888",
+                    "syntax_error": "#f44747",
+
+                    "preset_canvas_bg": "#ffffff",
+                    "preset_inner_bg": "#ffffff",
+                    "preset_frame_bg": "#ffffff",
+                }
+            elif preset == 'cherries':
+                self.theme = { 
+                    "canvas_background": "#2e1e1f", 
+                    "from_lines": "#f38ba8", 
+                    "to_lines": "#fab387",
+                    "randomEdgeFromColor": "#89b4fa",
+
+                    "default_node_color": "#4a2c31",
+                    "node_outline": "#6e2f3c",
+                    "node_selected_outline": "#fab387",
+                    "multi_selected_outline": "#f9e2af",
+                    "node_text_fill": "#f5f5f5",
+
+                    "inspector_bg": "#3c2a2e",
+                    "inspector_canvas_bg": "#3c2a2e",
+                    "title_lbl_bg": "#3c2a2e",
+                    "inspector_frame_bg": "#3c2a2e",
+                    "inspector_container": "#5a3a40",
+                    "inspector_body": "#5a3a40",
+                    "inspector_label_bg": "#5a3a40",
+                    "inspector_label_bg2": "#704348",
+                    "inspector_header": "#704348",
+                    "inspector_toggle_btn": "#704348",
+                    "inspector_textbox_bg": "#f5f5f5",
+                    "inspector_button_bg": "#f38ba8",
+
+                    "syntax_keyword": "#f38ba8", # red
+                    "syntax_comment": "#7f849c",
+                    "syntax_string": "#fab387",
+                    "syntax_number": "#a6e3a1",
+                    "syntax_variable": "#89b4fa",
+                    "syntax_separator": "#888888",
+                    "syntax_operator": "#888888",
+                    "syntax_error": "#f38ba8",
+
+                    "preset_canvas_bg": "#ffffff",
+                    "preset_inner_bg": "#ffffff",
+                    "preset_frame_bg": "#ffffff",
+                }
+            elif preset == 'ocean':
+                self.theme = { 
+                    "canvas_background": "#1e1e2e", 
+                    "from_lines": "#74c7ec", 
+                    "to_lines": "#1e66f5",
+                    "randomEdgeFromColor": "#f9e2af",
+
+                    "default_node_color": "#1e2a40",
+                    "node_outline": "#3a4c6e",
+                    "node_selected_outline": "#89dceb",
+                    "multi_selected_outline": "#fab387",
+                    "node_text_fill": "#f5f5f5",
+
+                    "inspector_bg": "#223449",
+                    "inspector_canvas_bg": "#223449",
+                    "title_lbl_bg": "#223449",
+                    "inspector_frame_bg": "#223449",
+                    "inspector_container": "#304c66",
+                    "inspector_body": "#304c66",
+                    "inspector_label_bg": "#304c66",
+                    "inspector_label_bg2": "#436585",
+                    "inspector_header": "#436585",
+                    "inspector_toggle_btn": "#436585",
+                    "inspector_textbox_bg": "#f5f5f5",
+                    "inspector_button_bg": "#89b4fa",
+
+                    "syntax_keyword": "#cba6f7", # lavender
+                    "syntax_comment": "#7f849c",
+                    "syntax_string": "#fab387",
+                    "syntax_number": "#a6e3a1",
+                    "syntax_variable": "#89b4fa",
+                    "syntax_separator": "#888888",
+                    "syntax_operator": "#888888",
+                    "syntax_error": "#f38ba8",
+
+                    "preset_canvas_bg": "#ffffff",
+                    "preset_inner_bg": "#ffffff",
+                    "preset_frame_bg": "#ffffff",
+                }
+            elif preset == 'forest':
+                self.theme = { 
+                    "canvas_background": "#232e25", 
+                    "from_lines": "#a6e3a1", 
+                    "to_lines": "#e5c890",
+                    "randomEdgeFromColor": "#89b4fa",
+
+                    "default_node_color": "#2e4630",
+                    "node_outline": "#4f6f56",
+                    "node_selected_outline": "#a6e3a1",
+                    "multi_selected_outline": "#fab387",
+                    "node_text_fill": "#f5f5f5",
+
+                    "inspector_bg": "#2a3e2f",
+                    "inspector_canvas_bg": "#2a3e2f",
+                    "title_lbl_bg": "#2a3e2f",
+                    "inspector_frame_bg": "#2a3e2f",
+                    "inspector_container": "#36543d",
+                    "inspector_body": "#36543d",
+                    "inspector_label_bg": "#36543d",
+                    "inspector_label_bg2": "#4a6b51",
+                    "inspector_header": "#4a6b51",
+                    "inspector_toggle_btn": "#4a6b51",
+                    "inspector_textbox_bg": "#f5f5f5",
+                    "inspector_button_bg": "#a6e3a1",
+
+                    "syntax_keyword": "#dfa00d", # dark yellow
+                    "syntax_comment": "#7f849c",
+                    "syntax_string": "#fab387",
+                    "syntax_number": "#a6e3a1",
+                    "syntax_variable": "#89b4fa",
+                    "syntax_separator": "#888888",
+                    "syntax_operator": "#888888",
+                    "syntax_error": "#f38ba8",
+
+                    "preset_canvas_bg": "#ffffff",
+                    "preset_inner_bg": "#ffffff",
+                    "preset_frame_bg": "#ffffff",
+                }
+            elif preset == 'ocean 2':
+                self.theme = { 
+                    "canvas_background": "#1e1e2e", 
+                    "from_lines": "#74c7ec", 
+                    "to_lines": "#cba6f7",
+                    "randomEdgeFromColor": "#fab387",
+
+                    "default_node_color": "#403347",
+                    "node_outline": "#5b4f63",
+                    "node_selected_outline": "#fab387",
+                    "multi_selected_outline": "#f9e2af",
+                    "node_text_fill": "#f5f5f5",
+
+                    "inspector_bg": "#2f2b3a",
+                    "inspector_canvas_bg": "#2f2b3a",
+                    "title_lbl_bg": "#2f2b3a",
+                    "inspector_frame_bg": "#2f2b3a",
+                    "inspector_container": "#473c57",
+                    "inspector_body": "#473c57",
+                    "inspector_label_bg": "#473c57",
+                    "inspector_label_bg2": "#5e4e71",
+                    "inspector_header": "#5e4e71",
+                    "inspector_toggle_btn": "#5e4e71",
+                    "inspector_textbox_bg": "#f5f5f5",
+                    "inspector_button_bg": "#cba6f7",
+
+                    "syntax_keyword": "#cba6f7", # lavender
+                    "syntax_comment": "#7f849c",
+                    "syntax_string": "#fab387",
+                    "syntax_number": "#a6e3a1",
+                    "syntax_variable": "#89b4fa",
+                    "syntax_separator": "#888888",
+                    "syntax_operator": "#888888",
+                    "syntax_error": "#f38ba8",
+
+                    "preset_canvas_bg": "#ffffff",
+                    "preset_inner_bg": "#ffffff",
+                    "preset_frame_bg": "#ffffff",
+                }
+            elif preset == 'bubblegum':
+                self.theme = {
+                    "canvas_background": "#663e5e", 
+                    "from_lines": "#ff97c9", 
+                    "to_lines": "#9C2071",
+                    "randomEdgeFromColor": "#a970d7",
+
+                    "default_node_color": "#B773AB",
+                    "node_outline": "#d6afd2",
+                    "node_selected_outline": "#ffffff",
+                    "multi_selected_outline": "#f9e2af",
+                    "node_text_fill": "#f5f5f5",
+
+                    "inspector_bg": "#3a2b37",
+                    "inspector_canvas_bg": "#3a2b37",
+                    "title_lbl_bg": "#3a2b37",
+                    "inspector_frame_bg": "#3a2b37",
+                    "inspector_container": "#573c52",
+                    "inspector_body": "#573c52",
+                    "inspector_label_bg": "#573c51",
+                    "inspector_label_bg2": "#714e6f",
+                    "inspector_header": "#714e6f",
+                    "inspector_toggle_btn": "#714e6f",
+                    "inspector_textbox_bg": "#f5f5f5",
+                    "inspector_button_bg": "#f7a6e4",
+
+                    "syntax_keyword": "#f7a6e4", # pink
+                    "syntax_comment": "#7f849c",
+                    "syntax_string": "#fab387",
+                    "syntax_number": "#a6e3a1",
+                    "syntax_variable": "#89b4fa",
+                    "syntax_separator": "#888888",
+                    "syntax_operator": "#888888",
+                    "syntax_error": "#f38ba8",
+
+                    "preset_canvas_bg": "#ffffff",
+                    "preset_inner_bg": "#ffffff",
+                    "preset_frame_bg": "#ffffff",                    
+                }
+            elif preset == 'underground':
+                self.theme = {
+                    "canvas_background": "#292522",
+                    "from_lines": "#ffd700",
+                    "to_lines": "#cd853f",
+                    "randomEdgeFromColor": "#b87333",
+
+                    "default_node_color": "#4d4540",
+                    "node_outline": "#6b5f58",
+                    "node_selected_outline": "#ffd700",
+                    "multi_selected_outline": "#ffec8b",
+                    "node_text_fill": "#f5deb3",
+
+                    "inspector_bg": "#3d3530",
+                    "inspector_canvas_bg": "#3d3530",
+                    "title_lbl_bg": "#3d3530",
+                    "inspector_frame_bg": "#3d3530",
+                    "inspector_container": "#524841",
+                    "inspector_body": "#524841",
+                    "inspector_label_bg": "#524841",
+                    "inspector_label_bg2": "#61564f",
+                    "inspector_header": "#61564f",
+                    "inspector_toggle_btn": "#61564f",
+                    "inspector_textbox_bg": "#f5f5f5",
+                    "inspector_button_bg": "#cd853f",
+
+                    "syntax_keyword": "#cd853f", # peru
+                    "syntax_comment": "#928374",
+                    "syntax_string": "#d65d0e",
+                    "syntax_number": "#b5cea8",
+                    "syntax_variable": "#83a598",
+                    "syntax_separator": "#7c6f64",
+                    "syntax_operator": "#7c6f64",
+                    "syntax_error": "#fb4934",
+
+                    "preset_canvas_bg": "#ffffff",
+                    "preset_inner_bg": "#ffffff",
+                    "preset_frame_bg": "#ffffff",
+                }
+            elif preset == 'sky':
+                self.theme = {
+                    "canvas_background": "#a0d2eb",
+                    "from_lines": "#ffdb58",
+                    "to_lines": "#4682b4",
+                    "randomEdgeFromColor": "#ffa500",
+
+                    "default_node_color": "#f5f5f5",
+                    "node_outline": "#dcdcdc",
+                    "node_selected_outline": "#ffdb58",
+                    "multi_selected_outline": "#f0e68c",
+                    "node_text_fill": "#333333",
+
+                    "inspector_bg": "#e0f2fe",
+                    "inspector_canvas_bg": "#e0f2fe",
+                    "title_lbl_bg": "#e0f2fe",
+                    "inspector_frame_bg": "#e0f2fe",
+                    "inspector_container": "#bde0fe",
+                    "inspector_body": "#bde0fe",
+                    "inspector_label_bg": "#bde0fe",
+                    "inspector_label_bg2": "#90c8f8",
+                    "inspector_header": "#90c8f8",
+                    "inspector_toggle_btn": "#90c8f8",
+                    "inspector_textbox_bg": "#ffffff",
+                    "inspector_button_bg": "#ffdb58",
+
+                    "syntax_keyword": "#4682b4", # steelblue
+                    "syntax_comment": "#3b82f6",
+                    "syntax_string": "#fb923c",
+                    "syntax_number": "#34d399",
+                    "syntax_variable": "#2563eb",
+                    "syntax_separator": "#6b7280", # grey
+                    "syntax_operator": "#6b7280", # grey
+                    "syntax_error": "#ef4444",
+
+                    "preset_canvas_bg": "#ffffff",
+                    "preset_inner_bg": "#ffffff",
+                    "preset_frame_bg": "#ffffff",
+                }
+            elif preset == 'night sky':
+                self.theme = {
+                    "canvas_background": "#0b1120",
+                    "from_lines": "#fde047",
+                    "to_lines": "#93c5fd",
+                    "randomEdgeFromColor": "#a5b4fc",
+
+                    "default_node_color": "#1e293b",
+                    "node_outline": "#475569",
+                    "node_selected_outline": "#fde047",
+                    "multi_selected_outline": "#f8fafc",
+                    "node_text_fill": "#e2e8f0",
+
+                    "inspector_bg": "#1c2436",
+                    "inspector_canvas_bg": "#1c2436",
+                    "title_lbl_bg": "#1c2436",
+                    "inspector_frame_bg": "#1c2436",
+                    "inspector_container": "#2a364e",
+                    "inspector_body": "#2a364e",
+                    "inspector_label_bg": "#2a364e",
+                    "inspector_label_bg2": "#3a4a66",
+                    "inspector_header": "#3a4a66",
+                    "inspector_toggle_btn": "#3a4a66",
+                    "inspector_textbox_bg": "#f8fafc",
+                    "inspector_button_bg": "#93c5fd",
+
+                    "syntax_keyword": "#60a5fa",
+                    "syntax_comment": "#64748b",
+                    "syntax_string": "#f59e0b",
+                    "syntax_number": "#34d399",
+                    "syntax_variable": "#818cf8",
+                    "syntax_separator": "#94a3b8",
+                    "syntax_operator": "#94a3b8",
+                    "syntax_error": "#f87171",
+
+                    "preset_canvas_bg": "#ffffff",
+                    "preset_inner_bg": "#ffffff",
+                    "preset_frame_bg": "#ffffff",
+                }
+            elif preset == 'lemon':
+                self.theme = {
+                    "canvas_background": "#fefce8",
+                    "from_lines": "#4ade80",
+                    "to_lines": "#a3e635",
+                    "randomEdgeFromColor": "#f97316",
+
+                    "default_node_color": "#fef9c3",
+                    "node_outline": "#fde68a",
+                    "node_selected_outline": "#4ade80",
+                    "multi_selected_outline": "#84cc16",
+                    "node_text_fill": "#422006",
+
+                    "inspector_bg": "#fefce8",
+                    "inspector_canvas_bg": "#fefce8",
+                    "title_lbl_bg": "#fefce8",
+                    "inspector_frame_bg": "#fefce8",
+                    "inspector_container": "#fef9c3",
+                    "inspector_body": "#fef9c3",
+                    "inspector_label_bg": "#fef9c3",
+                    "inspector_label_bg2": "#fde68a",
+                    "inspector_header": "#fde68a",
+                    "inspector_toggle_btn": "#fde68a",
+                    "inspector_textbox_bg": "#ffffff",
+                    "inspector_button_bg": "#a3e635",
+
+                    "syntax_keyword": "#f97316", # orange
+                    "syntax_comment": "#ca8a04",
+                    "syntax_string": "#2563eb",
+                    "syntax_number": "#16a34a",
+                    "syntax_variable": "#4f46e5",
+                    "syntax_separator": "#44403c",
+                    "syntax_operator": "#44403c",
+                    "syntax_error": "#dc2626",
+
+                    "preset_canvas_bg": "#ffffff",
+                    "preset_inner_bg": "#ffffff",
+                    "preset_frame_bg": "#ffffff",
+                }
+            elif preset == '90s':
+                self.theme = {
+                    "canvas_background": "#111111",
+                    "from_lines": "#cccccc",
+                    "to_lines": "#999999",
+                    "randomEdgeFromColor": "#eeeeee",
+
+                    "default_node_color": "#222222",
+                    "node_outline": "#555555",
+                    "node_selected_outline": "#ffffff",
+                    "multi_selected_outline": "#dddddd",
+                    "node_text_fill": "#eeeeee",
+
+                    "inspector_bg": "#181818",
+                    "inspector_canvas_bg": "#181818",
+                    "title_lbl_bg": "#181818",
+                    "inspector_frame_bg": "#181818",
+                    "inspector_container": "#282828",
+                    "inspector_body": "#282828",
+                    "inspector_label_bg": "#282828",
+                    "inspector_label_bg2": "#383838",
+                    "inspector_header": "#383838",
+                    "inspector_toggle_btn": "#383838",
+                    "inspector_textbox_bg": "#cccccc",
+                    "inspector_button_bg": "#444444",
+                    "inspector_text_fg": "#000000",
+
+                    "syntax_keyword": "#222222",
+                    "syntax_comment": "#666666",
+                    "syntax_string": "#333333",
+                    "syntax_number": "#333333",
+                    "syntax_variable": "#333333",
+                    "syntax_separator": "#555555",
+                    "syntax_operator": "#555555",
+                    "syntax_error": "#000000",
+
+                    "preset_canvas_bg": "#333333",
+                    "preset_inner_bg": "#333333",
+                    "preset_frame_bg": "#333333",
+                }
+            
+        try:
+            #self.theme.setdefault('randomEdgeFromColor', '#8e44ff')
+            self.canvas.config(bg=self.theme['canvas_background'])
+            self.inspector.config(bg=self.theme['inspector_bg'])
+            self.inspector_canvas.config(bg=self.theme['inspector_canvas_bg'])
+            self.title_lbl.config(bg=self.theme['title_lbl_bg'])
+            self.inspector_frame.config(bg=self.theme['inspector_frame_bg'])
+            self.toolbar.configure(bg_color=self.theme['inspector_bg'], fg_color=self.theme['inspector_bg'])     
+            self.focus_canvas_btn.configure(fg_color=self.theme['inspector_bg'], text_color=self.theme['node_text_fill'], hover_color=self.theme['default_node_color'])
+            self.mode_button.configure(fg_color=self.theme['inspector_bg'], text_color=self.theme['node_text_fill'], hover_color=self.theme['default_node_color'])
+            self.settings_btn.configure(fg_color=self.theme['inspector_bg'], text_color=self.theme['node_text_fill'], hover_color=self.theme['default_node_color'])
+            self.tc_btn.configure(fg_color=self.theme['inspector_bg'], text_color=self.theme['node_text_fill'], hover_color=self.theme['default_node_color'])
+            self.search_entry.configure(fg_color=self.theme['inspector_bg'], border_color=self.theme['inspector_button_bg'], text_color=self.theme['node_text_fill'])
+            #self.versiondisp.configure(text_color=self.theme['node_text_fill'])
+            #self.node_count_label.configure(text_color=self.theme['node_text_fill'])
+            self.redraw()
+
+            def apply_theme_recursive(widget):
+                for child in widget.winfo_children():
+                    # Pick a bg depending on widget type
+                    if isinstance(child, tk.Label):
+                        child.configure(bg=self.theme.get("inspector_label_bg", "#2e2e3e"),
+                                    fg=self.theme.get("node_text_fill", "#ffffff"))
+                    elif isinstance(child, tk.Button):
+                        if child.winfo_parent() != str(self.preset_inner):
+                            child.configure(bg=self.theme.get("inspector_button_bg", "#a6e3a1"))
+                    elif isinstance(child, tk.Text):
+                        child.configure(
+                            bg=self.theme.get("inspector_textbox_bg", "#f5f5f5"),
+                            fg=self.theme.get("inspector_text_fg", "#000000")
+                        )
+                    elif isinstance(child, tk.Frame):
+                        child.configure(bg=self.theme.get("inspector_body", "#313244"))
+                    elif isinstance(child, tk.Canvas):
+                        child.configure(bg=self.theme.get("inspector_canvas_bg", "#2e2e3e"))
+
+                    # Recurse
+                    apply_theme_recursive(child)
+
+            apply_theme_recursive(self.inspector)
+            
+            if self.settings['change_node_colors']:
+                self.change_every_node_color(self.theme.get('default_node_color', '#222222'))
+            
+            self._configure_syntax_highlighting() # Re-apply tag colors
+
+        except Exception:
+            pass
+
+    def add_comment_prompt(self):
+        self.add_comment()
+
+    def setup_controls(self):
+        self.pressed_keys = set()
+
+        self.canvas.focus_set()
+
+        self.canvas.bind("<KeyPress-w>", lambda e: self.pressed_keys.add("w"))
+        self.canvas.bind("<KeyRelease-w>", lambda e: self.pressed_keys.discard("w"))
+
+        self.canvas.bind("<KeyPress-a>", lambda e: self.pressed_keys.add("a"))
+        self.canvas.bind("<KeyRelease-a>", lambda e: self.pressed_keys.discard("a"))
+
+        self.canvas.bind("<KeyPress-s>", lambda e: self.pressed_keys.add("s"))
+        self.canvas.bind("<KeyRelease-s>", lambda e: self.pressed_keys.discard("s"))
+
+        self.canvas.bind("<KeyPress-d>", lambda e: self.pressed_keys.add("d"))
+        self.canvas.bind("<KeyRelease-d>", lambda e: self.pressed_keys.discard("d"))        
+
+        self.update_cam()
+
+    def focus_canvas(self, event=None):
+        try:
+            self.canvas.confgure(takeFocus=1)
+        except Exception:
+            pass
+        self.canvas.focus_set()
+
+    def reset_all(self):
+        if messagebox.askyesno('Reset All?', f'Continuing will delete all {len(self.node_rects)} nodes. Are you SURE?'):
+            self.push_undo()
+            nodes.clear(); vars_store.clear(); inventory.clear()
+            self.redraw()
+
+    def update_cam(self):
+        dx = dy = 0
+        step = 1
+
+        if "w" in self.pressed_keys: dy -= step
+        if "s" in self.pressed_keys: dy += step
+        if "a" in self.pressed_keys: dx -= step
+        if "d" in self.pressed_keys: dx += step
+
+        if dx or dy:
+            self.canvas.xview_scroll(dx, "units")
+            self.canvas.yview_scroll(dy, "units")
+        self.canvas.after(16, self.update_cam)
+
+    def apply_keybinds(self):
+        for seq in list(self.master.bind()):
+            if seq in self.settings["keybinds"].values():
+                self.master.unbind(seq)
+        self.master.bind(self.settings["keybinds"]["undo"], lambda e: self.undo())
+        self.master.bind(self.settings["keybinds"]["redo"], lambda e: self.redo())
+        self.master.bind(self.settings["keybinds"]["redo_alt"], lambda e: self.redo())
+        #self.master.bind(self.settings["keybinds"]["reset_zoom"], lambda e: self.reset_zoom())
+        self.master.bind(self.settings["keybinds"]["save"], lambda e: self.save_story_dialog())        
+        self.app_menu.entryconfig(0, label=f"Undo ({self.pretty_key(self.settings['keybinds']['undo'])})")
+        self.app_menu.entryconfig(1, label=f"Redo ({self.pretty_key(self.settings['keybinds']['redo'])} / {self.pretty_key(self.settings['keybinds']['redo_alt'])})")
+        #self.app_menu.entryconfig(3, label=f"Reset Zoom ({self.pretty_key(self.settings['keybinds']['reset_zoom'])})")
+        self.app_menu.entryconfig(5, label=f"Save ({self.pretty_key(self.settings['keybinds']['save'])})")
+        
+    def pretty_key(self, seq: str) -> str:
+        return seq.replace("<Control-", "Ctrl+").replace("<Shift-", "Shift+").replace(">", "").upper()
+
+    def open_settings(self):
+        win = tk.Toplevel(self)
+        win.title("Settings")
+        win.minsize(500, 250)
+
+        # --- Checkbox settings ---
+        checkbox_settings = [
+            ("show_path", "Show path in play mode at the end."),
+            ("disable_delete_confirm", "Disable deletion confirmation dialogs."),
+            ("disable_text_truncation", "Disable text truncation in nodes ('...')."),
+            ("udtdnc", "Use theme's default node color when creating a new node."),
+            ("change_node_colors", "Apply theme's default node color to all nodes when switching themes.")
+        ]
+
+        for key, text in checkbox_settings:
+            var = tk.BooleanVar(value=self.settings.get(key, False))
+            command = lambda k=key, v=var: self.settings.update({k: v.get()})
+            chk = tk.Checkbutton(win, text=text, variable=var, command=command, wraplength=480, justify=tk.LEFT)
+            chk.pack(anchor="w", pady=2, padx=4)
+
+        ttk.Separator(win).pack(fill='x', pady=10, padx=5)
+
+        # --- Keybind settings ---
+        tk.Label(win, text="Keybinds:").pack(anchor="w", padx=4)
+        
+        keybind_frame = tk.Frame(win)
+        keybind_frame.pack(fill='x', padx=4, pady=2)
+        keybind_frame.columnconfigure(1, weight=1) # Make entry expand
+
+        for i, (action, seq) in enumerate(self.settings["keybinds"].items()):
+            tk.Label(keybind_frame, text=action.capitalize()).grid(row=i, column=0, sticky='w', padx=4, pady=2)
+            
+            entry = tk.Entry(keybind_frame)
+            entry.insert(0, seq)
+            entry.grid(row=i, column=1, sticky='ew', padx=4, pady=2)
+
+            def save_bind(a=action, e=entry):
+                self.settings["keybinds"][a] = e.get()
+                self.apply_keybinds()
+
+            tk.Button(keybind_frame, text="Apply", command=save_bind).grid(row=i, column=2, sticky='e', padx=4, pady=2)
+                
+    def is_valid_action(self, s: str) -> bool:
+        s = s.strip()
+        if not s: return True
+
+        # Check against known action patterns
+        if re.match(r"^if\(", s): return True
+        if s.startswith("chance(") and s.endswith(")"): return True
+        if s.startswith("weighted(") and s.endswith(")"): return True
+        if s.startswith("randr(") and s.endswith(")"): return True
+        if s.startswith("rands(") and s.endswith(")"): return True
+        if s.startswith("clamp(") and s.endswith(")"): return True
+        if s.startswith("consume(") and s.endswith(")"): return True
+        if s.startswith("rlet:"): return True
+        if s == "clearinv": return True
+        # Assignment: var=... var+=...
+        if re.match(r"^[A-Za-z_][A-Za-z0-9_]*\s*([\+\-\*/]?=)", s): return True
+        
+        # Check for keyword:value patterns
+        m = self.error_pattern.match(s)
+        if m:
+            keyword = m.group(1)
+            # Only certain keywords are valid as top-level actions
+            return keyword in {'add_item', 'remove_item', 'goto', 'once', 'repeat', 'set'}
+        
+        return False
+
+    def highlight_line_errors(self, line: str, line_num: int):
+        stripped_line = line.strip()
+        if not stripped_line or stripped_line.startswith('#'):
+            return
+
+        # --- Check 1: Too many pipe separators ---
+        if line.count('|') > 3:
+            self.options_text.tag_add("syntax_error", f"{line_num}.0", f"{line_num}.{len(line)}")
+            return
+
+        # --- Check 2: Unbalanced brackets/parentheses ---
+        stack = []
+        pairs = {'(': ')', '[': ']', '{': '}'}
+        for idx, char in enumerate(line):
+            if char in pairs:
+                stack.append((char, idx))
+            elif char in pairs.values():
+                if not stack or pairs[stack.pop()[0]] != char:
+                    self.options_text.tag_add("syntax_error", f"{line_num}.{idx}", f"{line_num}.{idx+1}")
+        for _, idx in stack: # Highlight unclosed opening brackets
+            self.options_text.tag_add("syntax_error", f"{line_num}.{idx}", f"{line_num}.{idx+1}")
+
+        # --- Check 3: Invalid actions in the action part ---
+        parts = line.split('|')
+        if len(parts) > 3:
+            actions_string = parts[3]
+            pipe_indices = [i for i, char in enumerate(line) if char == '|']
+            if len(pipe_indices) >= 3:
+                actions_start_index = pipe_indices[2] + 1
+                for match in re.finditer(r'[^;&]+', actions_string):
+                    action = match.group(0).strip()
+                    if not action: continue
+                    
+                    if not self.is_valid_action(action):
+                        start, end = match.span()
+                        self.options_text.tag_add("syntax_error", f"{line_num}.{actions_start_index + start}", f"{line_num}.{actions_start_index + end}")
+
+    def _configure_syntax_highlighting(self):
+        self.syntax_tags = [
+            "syntax_keyword", "syntax_comment", "syntax_string", "syntax_number",
+            "syntax_variable", "syntax_separator", "syntax_operator", "syntax_error"
+        ]
+        self.syntax_tags.append("syntax_function_name") # Add new tag for function names
+        
+        # Define colors for tags from theme
+        self.options_text.tag_configure("syntax_keyword", foreground=self.theme.get("syntax_keyword", "#c586c0"))
+        self.options_text.tag_configure("syntax_comment", foreground=self.theme.get("syntax_comment", "#6A9955"))
+        self.options_text.tag_configure("syntax_string", foreground=self.theme.get("syntax_string", "#ce9178"))
+        self.options_text.tag_configure("syntax_number", foreground=self.theme.get("syntax_number", "#b5cea8"))
+        self.options_text.tag_configure("syntax_variable", foreground=self.theme.get("syntax_variable", "#9cdcfe"))
+        self.options_text.tag_configure("syntax_separator", foreground=self.theme.get("syntax_separator", "#d4d4d4"))
+        self.options_text.tag_configure("syntax_operator", foreground=self.theme.get("syntax_operator", "#d4d4d4"))
+        self.options_text.tag_configure("syntax_operator", foreground=self.theme.get("syntax_operator", "#d4d4d4")) 
+        self.options_text.tag_configure("syntax_error", foreground=self.theme.get("syntax_error", "#f44747"), underline=True)
+        self.options_text.tag_configure("syntax_function_name", foreground=self.theme.get("syntax_variable", "#9cdcfe")) # Use variable color for function names
+        
+        self.known_keywords = {
+            'if', 'once', 'repeat', 'chance', 'weighted', 'randr', 'rands', 'goto',
+            'add_item', 'remove_item', 'clearinv', 'set', 'not_has_item', 'has_item',
+            'clamp', 'consume', 'rlet'
+        }
+        
+        # Patterns for highlighting. Order matters.
+        self.highlight_patterns = [
+            ("syntax_comment", re.compile(r'#.*')),
+            ("syntax_variable", re.compile(r'\{[A-Za-z_][A-Za-z0-9_]*\}')),
+            ("syntax_function_name_pattern", re.compile(r'&([A-Za-z_][A-Za-z0-9_]*)\(')),
+            ("syntax_string", re.compile(r'"[^"]*"|\'[^\']*\'')),
+            ("syntax_keyword", re.compile(r'\b(' + '|'.join(self.known_keywords) + r')\b')),
+            ("syntax_number", re.compile(r'\b-?\d+(\.\d+)?\b')),
+            ("syntax_separator", re.compile(r'\||>>?|[:&;()]')),
+            ("syntax_operator", re.compile(r'[\+\-\*/]?=')),
+        ]
+        
+        self.error_pattern = re.compile(r'\b([a-zA-Z_]+)(?=:)\b')
+        self.known_action_prefixes = {'add_item', 'remove_item', 'goto', 'once', 'repeat', 'set', 'var', 'has_item', 'not_has_item', 'weighted', 'randr', 'rands', 'clamp', 'consume', 'rlet'}
+
+        # Bind events
+        self.options_text.bind("<<Modified>>", self._schedule_highlight, add="+")
+
+    def _schedule_highlight(self, event=None):
+        if self.updating:
+            self.options_text.edit_modified(False)
+            return
+
+        # Only proceed if the widget was actually modified.
+        if self.options_text.edit_modified():
+            # Reset the flag so we can catch the next modification.
+            self.options_text.edit_modified(False)
+            
+            # Debounce the actual highlighting work.
+            if self._highlight_job:
+                self.after_cancel(self._highlight_job)
+            self._highlight_job = self.after(150, self._highlight_syntax)
+
+    def _highlight_syntax(self):
+        if not self.options_text.winfo_exists(): return
+        self._highlight_job = None
+        
+        for tag in self.syntax_tags:
+            self.options_text.tag_remove(tag, "1.0", "end")
+
+        for i, line in enumerate(self.options_text.get("1.0", "end-1c").splitlines()):
+            line_num = i + 1
+            for tag, pattern in self.highlight_patterns:
+                for match in pattern.finditer(line):
+                    if tag == "syntax_function_name_pattern":
+                        # Apply 'syntax_function_name' tag to the captured group (the function name)
+                        func_name_start, func_name_end = match.span(1)
+                        self.options_text.tag_add("syntax_function_name", f"{line_num}.{func_name_start}", f"{line_num}.{func_name_end}")
+                    else:
+                        start, end = match.span()
+                        self.options_text.tag_add(tag, f"{line_num}.{start}", f"{line_num}.{end}")
+            self.highlight_line_errors(line, line_num)
+
+    def open_themecontrol(self):
+        self.win = tk.Toplevel(self)
+        self.win.title("Theme")
+        self.win.geometry('205x500')
+        self.win.winfo_x = 0
+        self.win.winfo_y = 0
+
+        tk.Label(self.win, text='Presets', font=("TkDefaultFont", 11)).pack()
+        tk.Button(self.win, text='Default', command=lambda: self.themepreset('default', 1)).pack(side=tk.TOP, pady=4)
+        tk.Button(self.win, text='Cherries', command=lambda: self.themepreset('cherries', 1)).pack(side=tk.TOP, pady=4)
+        tk.Button(self.win, text='Ocean', command=lambda: self.themepreset('ocean', 1)).pack(side=tk.TOP, pady=4)
+        tk.Button(self.win, text='Ocean (v2)', command=lambda: self.themepreset('ocean 2', 1)).pack(side=tk.TOP, pady=4) 
+        tk.Button(self.win, text='Forest', command=lambda: self.themepreset('forest', 1)).pack(side=tk.TOP, pady=4)
+        tk.Button(self.win, text='Bubblegum', command=lambda: self.themepreset('bubblegum', 1)).pack(side=tk.TOP, pady=4)
+        tk.Button(self.win, text='Underground', command=lambda: self.themepreset('underground', 1)).pack(side=tk.TOP, pady=4)
+        tk.Button(self.win, text='Sky', command=lambda: self.themepreset('sky', 1)).pack(side=tk.TOP, pady=4)
+        tk.Button(self.win, text='Night Sky', command=lambda: self.themepreset('night sky', 1)).pack(side=tk.TOP, pady=4)
+        tk.Button(self.win, text='Lemon', command=lambda: self.themepreset('lemon', 1)).pack(side=tk.TOP, pady=4)
+        tk.Button(self.win, text='90s', command=lambda: self.themepreset('90s', 1)).pack(side=tk.TOP, pady=4)
+
+    def update_node_count(self):
+        self.node_count_label.configure(text=f"Nodes: {len(self.node_rects)}")
+
+    def save_theme(self):
+        try:
+            with open(THEME_PATH, "w") as f:
+                json.dump(self.theme, f, indent=4)
+        except Exception as e:
+            print("Failed to save settings:", e)      
+
+    def load_theme(self):
+        if os.path.exists(THEME_PATH):
+            try:
+                with open(THEME_PATH, "r") as f:
+                    data = json.load(f)
+                    self.theme.update(data)  
+            except Exception as e:
+                print("Failed to load settings:", e)    
+        self.themepreset(None)
+                
+    def on_exit(self):
+        try:
+            self.close_play()   # stop play mode cleanly
+        except Exception as e:
+            print("close_play failed:", e)
+
+        self.save_settings()
+        self.save_theme()
+        self.master.destroy()
+
+    def update_settings(self):
+        self.settings["disable_delete_confirm"] = self.delete_confirm_var.get()    
+        self.settings["show_path"] = self.show_path.get()    
+        self.settings["udtdnc"] = self.udtdnc.get() 
+        self.settings["change_node_colors"] = self.change_node_colors.get() 
+        self.settings['default_comment_w'] = self.default_comment_w.get()
+        self.settings['default_comment_h'] = self.default_comment_h.get()
+        #self.settings["disable_zooming"] = self.disable_zooming.get() 
+
+    def add_node_prompt(self):
+        self._apply_pending_inspector_edits()
+        w, h = self.canvas.winfo_width(), self.canvas.winfo_height()
+        x, y = self.canvas.canvasx(w / 2), self.canvas.canvasy(h / 2)        
+        nid = simpledialog.askinteger("Add Node", "Node ID (int):", minvalue=1)
+        if nid is None:
+            return
+        if nid in nodes:
+            if not messagebox.askyesno("Overwrite?", f"Node {nid} exists — overwrite?"):
+                return
+        self.selected_node = nid
+
+        # Color logic
+        if self.settings.get('udtdnc', False) == False:
+            color = '#222222'
+        else:
+            color = self.theme['default_node_color']
+
+        # Create node
+        nodes[nid] = {
+            "x": x,
+            "y": y,
+            "header": f"Node {nid}",
+            "options": [],
+            "color": color     
+        }
+        #create_node(nid, f'Node {nid}', x, y, )
+        self.push_undo()
+        self.redraw()
+
+    def push_undo(self):
+        state = {
+            "nodes": copy.deepcopy(nodes),
+            "vars": vars_store.copy(),
+            "inventory": inventory.copy(),
+            "comments": copy.deepcopy(comments),
+            "selected_node": self.selected_node,
+            "selected_comment": self.selected_comment
+        }
+        self.undo_stack.append(state)
+        self.redo_stack.clear()
+
+    def undo(self):
+        global nodes, vars_store, inventory, comments
+        if not self.undo_stack:
+            return
+        
+        # save current state to redo
+        self.redo_stack.append({
+            "nodes": copy.deepcopy(nodes),
+            "vars": vars_store.copy(),
+            "inventory": inventory.copy(),
+            "comments": copy.deepcopy(comments),
+            "selected_node": self.selected_node,
+            "selected_comment": self.selected_comment
+        })
+
+        # restore undo state
+        state = self.undo_stack.pop()
+        nodes = {int(k): v for k, v in state["nodes"].items()}
+        vars_store = state["vars"]
+        inventory[:] = state["inventory"]
+        comments = {int(k): v for k, v in state["comments"].items()}
+        self.selected_node = state["selected_node"]
+        self.selected_comment = state["selected_comment"]
+
+        self.redraw()
+
+    def redo(self):
+        global nodes, vars_store, inventory, comments
+        if not self.redo_stack:
+            return
+        
+        # save current state to undo
+        self.undo_stack.append({
+            "nodes": copy.deepcopy(nodes),
+            "vars": vars_store.copy(),
+            "inventory": inventory.copy(),
+            "comments": copy.deepcopy(comments),
+            "selected_node": self.selected_node,
+            "selected_comment": self.selected_comment
+        })
+
+        # restore redo state
+        state = self.redo_stack.pop()
+        nodes = {int(k): v for k, v in state["nodes"].items()}
+        vars_store = state["vars"]
+        inventory[:] = state["inventory"]
+        comments = {int(k): v for k, v in state["comments"].items()}
+        self.selected_node = state["selected_node"]
+        self.selected_comment = state["selected_comment"]
+
+        self.redraw()
+
+    def center_canvas_on(self, cx, cy):
+        # ensure geometry & items are up to date
+        self.canvas.update_idletasks()
+
+        canvas_w = self.canvas.winfo_width()
+        canvas_h = self.canvas.winfo_height()
+
+        bbox = self.canvas.bbox("all")
+        if not bbox:
+            return
+
+        left, top, right, bottom = bbox
+        total_w = right - left
+        total_h = bottom - top
+
+        # make sure scrollregion matches actual content bbox so fractions are computed consistently
+        try:
+            # configure accepts a tuple fine
+            self.canvas.configure(scrollregion=(left, top, right, bottom))
+        except Exception:
+            # ignore if configure fails for some reason
+            pass
+
+        # target top-left of view so (cx,cy) becomes centered
+        target_left = cx - (canvas_w / 2)
+        target_top  = cy - (canvas_h / 2)
+
+        # compute maximum scrollable offset (in canvas coords)
+        max_x = max(0.0, total_w - canvas_w)
+        max_y = max(0.0, total_h - canvas_h)
+
+        # convert target_left/top into a fraction [0..1] relative to bbox left/top
+        if max_x > 0.0:
+            frac_x = (target_left - left) / max_x
+        else:
+            frac_x = 0.0
+
+        if max_y > 0.0:
+            frac_y = (target_top - top) / max_y
+        else:
+            frac_y = 0.0
+
+        # clamp
+        frac_x = max(0.0, min(1.0, frac_x))
+        frac_y = max(0.0, min(1.0, frac_y))
+
+        self.canvas.xview_moveto(frac_x)
+        self.canvas.yview_moveto(frac_y)
+
+    def search_node(self, event=None):
+        self._apply_pending_inspector_edits()
+        nid_str = self.search_var.get().strip()
+        if not nid_str.isdigit():
+            return
+        nid = int(nid_str)
+        if nid not in nodes:
+            return
+
+        # select & show in inspector
+        self.selected_node = nid
+        self.load_selected_into_inspector()
+        # redraw so the node rect/text exist with correct coords
+        self.redraw()
+
+        # make sure canvas geometry is ready
+        self.canvas.update_idletasks()
+
+        node = nodes[nid]
+        # nodes store top-left x,y — center on node center
+        cx = node.get("x", 50) + (NODE_W / 2)
+        cy = node.get("y", 50) + (NODE_H / 2)
+
+        # center (this will also set scrollregion to bbox("all") internally)
+        self.center_canvas_on(cx, cy)
+
+        # optional: flash a highlight rectangle so it's obvious which node was found
+        try:
+            hl = self.canvas.create_rectangle(
+                node.get("x",50), node.get("y",50),
+                node.get("x",50) + NODE_W, node.get("y",50) + NODE_H,
+                outline=self.theme.get('node_selected_outline', '#00ff00'),
+                width=3, tags=("search_highlight",)
+            )
+            self.canvas.after(800, lambda: self.canvas.delete(hl))
+        except Exception:
+            pass
+
+    def multi_select_start(self, event): # start multi-selection.
+        self.multi_select_start_pos = (self.canvas.canvasx(event.x), self.canvas.canvasy(event.y))
+        self.multi_selected_nodes.clear()
+        if self.multi_select_rect:
+            self.canvas.delete(self.multi_select_rect)
+        self.multi_select_rect = self.canvas.create_rectangle(
+            *self.multi_select_start_pos, *self.multi_select_start_pos,
+            outline="#ffcc00", dash=(3,3)
+        )
+
+    def multi_select_drag(self, event): # start multi-selection drag (move)
+        x0, y0 = self.multi_select_start_pos
+        x1, y1 = self.canvas.canvasx(event.x), self.canvas.canvasy(event.y)
+        self.canvas.coords(self.multi_select_rect, x0, y0, x1, y1)
+
+    def multi_select_end(self, event): # end multi-selection
+        x0, y0 = self.multi_select_start_pos
+        x1, y1 = self.canvas.canvasx(event.x), self.canvas.canvasy(event.y)
+        if x1 < x0: x0, x1 = x1, x0
+        if y1 < y0: y0, y1 = y1, y0
+
+        self.multi_selected_nodes.clear()
+        for nid, data in nodes.items():
+            nx, ny = data["x"], data["y"]
+            if (nx + NODE_W >= x0 and nx <= x1) and (ny + NODE_H >= y0 and ny <= y1):
+                self.multi_selected_nodes.add(nid)
+
+        if self.multi_select_rect:
+            self.canvas.delete(self.multi_select_rect)
+            self.multi_select_rect = None
+
+        self.redraw()
+
+    def enter_disconnect_mode(self, nid): # opposite of 'enter_connection_mode()'.
+        self.disconnect_source = nid
+        self.mode = "disconnect"
+        self.canvas.config(cursor="X_cursor")  
+        
+    def node_right_click(self, event): # this is called when you right-click a node
+        cx = self.canvas.canvasx(event.x)
+        cy = self.canvas.canvasy(event.y)
+        clicked = self.canvas.find_overlapping(cx, cy, cx, cy)
+        clicked_node = None
+        for item in clicked:
+            for t in self.canvas.gettags(item):
+                if t.isdigit():
+                    clicked_node = int(t)
+                    break
+            if clicked_node:
+                break
+
+        if clicked_node is None:
+            return "break"  
+
+        
+        if clicked_node not in self.multi_selected_nodes:
+            self.selected_node = clicked_node
+            self.multi_selected_nodes.clear()
+        else:
+            self.selected_node = None
+
+        
+        menu = tk.Menu(self, tearoff=0)
+        menu.add_command(label="Change ID", command=lambda: self.change_node_id(clicked_node))
+        menu.add_command(label="Duplicate", command=self.duplicate_multi_nodes)
+        menu.add_command(label="Connect", command=lambda: self.enter_connection_mode(clicked_node))
+        menu.add_command(label="Disconnect", command=lambda: self.enter_disconnect_mode(clicked_node))
+        menu.add_command(label="Delete", command=self.delete_multi_nodes)
+
+        menu.tk_popup(event.x_root, event.y_root)
+        return "break"
+
+    def comment_right_click(self, event):
+        cx = self.canvas.canvasx(event.x)
+        cy = self.canvas.canvasy(event.y)
+        clicked = self.canvas.find_overlapping(cx, cy, cx, cy)
+        clicked_comment = None
+
+        for item in clicked:
+            for t in self.canvas.gettags(item):
+                if t.startswith("comment"):
+                    # tags look like ("comment", "3"), so grab second tag
+                    for tag in self.canvas.gettags(item):
+                        if tag.isdigit():
+                            clicked_comment = int(tag)
+                            break
+            if clicked_comment is not None:
+                break
+
+        if clicked_comment is None:
+            return "break"
+
+        self.selected_comment = clicked_comment
+
+        menu = tk.Menu(self, tearoff=0)
+        menu.add_command(label="Delete", command=lambda: self.delete_comment(clicked_comment))
+
+        menu.tk_popup(event.x_root, event.y_root)
+        return "break"
+
+    def background_right_click(self, event): # this is called when you right-click the background.
+        cx, cy = self.canvas.canvasx(event.x), self.canvas.canvasy(event.y)
+        clicked = self.canvas.find_overlapping(cx, cy, cx, cy)
+        for item in clicked:
+            if any(t.isdigit() for t in self.canvas.gettags(item)):
+                return "break"  
+
+        self.bg_menu.tk_popup(event.x_root, event.y_root)
+        return "break"
+
+    def delete_comment(self, cid):
+        if cid not in comments:
+            return
+        # clear handles, canvas items, and stored refs
+        self.clear_comment_handles(cid)
+        if hasattr(self, "comment_rects") and cid in self.comment_rects:
+            try: self.canvas.delete(self.comment_rects[cid])
+            except: pass
+            del self.comment_rects[cid]
+        if hasattr(self, "comment_texts") and cid in self.comment_texts:
+            try: self.canvas.delete(self.comment_texts[cid])
+            except: pass
+            del self.comment_texts[cid]
+        # finally remove from the dict
+        del comments[cid]
+        if self.selected_comment == cid:
+            self.selected_comment = None
+
+    def delete_multi_nodes(self): # delete multiple nodes, happens when multi-selecting nodes.
+        self.push_undo() # Added for undo functionality
+        targets = self.multi_selected_nodes if self.multi_selected_nodes else {self.selected_node}
+        if not targets:
+            return
+        if not self.settings.get("disable_delete_confirm", False):
+            if not messagebox.askyesno("Delete", f"Delete {len(targets)} node(s)?"):
+                return
+        for nid in targets:
+            # Delete from the global nodes dictionary
+            if nid in nodes:
+                del nodes[nid]
+            # Delete associated canvas items immediately to prevent visual glitches
+            if nid in self.node_rects:
+                self.canvas.delete(self.node_rects[nid])
+                del self.node_rects[nid]
+            if nid in self.node_texts:
+                self.canvas.delete(self.node_texts[nid])
+                del self.node_texts[nid]
+            if nid in self.node_base_fonts:
+                del self.node_base_fonts[nid]
+
+        self.selected_node = None
+        self.multi_selected_nodes.clear() # Ensure this is cleared
+        self.redraw()
+        self.clear_inspector()
+        self.update_node_count()
+
+    def clear_all_saves(self): # clears all saves in the save path (by default [the save path is]: ./saves/)
+        import shutil
+        from tkinter import messagebox
+
+        if not os.path.exists("./saves"):
+            messagebox.showinfo("No saves", "The ./saves/ folder does not exist.")
+            return
+
+        if messagebox.askyesno("Dangerous!", "This will delete EVERYTHING in ./saves/. Are you sure?"):
+            try:
+                shutil.rmtree("./saves")
+                os.makedirs("./saves", exist_ok=True)
+                messagebox.showinfo("Cleared", "All saves have been deleted.")
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to clear saves: {e}")
+
+    def load_settings(self): # load settings at settings path. (default settings path is: ./settings.json)
+        if os.path.exists(SETTINGS_PATH):
+            try:
+                with open(SETTINGS_PATH, "r") as f:
+                    data = json.load(f)
+                    self.settings.update(data)  
+            except Exception as e:
+                print("Failed to load settings:", e)
+
+    def save_settings(self): # save self.settings 
+        try:
+            with open(SETTINGS_PATH, "w") as f:
+                json.dump(self.settings, f, indent=4)
+        except Exception as e:
+            print("Failed to save settings:", e)
+
+    def duplicate_multi_nodes(self): # duplicate multiple nodes at once, happens when you're multi-selecting
+        self._apply_pending_inspector_edits()
+        targets = self.multi_selected_nodes if self.multi_selected_nodes else {self.selected_node}
+        new_ids = []
+        for nid in targets:
+            new_id = max(nodes.keys(), default=0) + 1
+            data = nodes[nid].copy()
+            data["x"] += 20; data["y"] += 20
+            nodes[new_id] = data
+            new_ids.append(new_id)
+        self.selected_node = new_ids[0] if new_ids else None
+        self.multi_selected_nodes.clear()
+        self.redraw()
+
+    def change_node_id(self, old_id: int):
+        if old_id not in nodes:
+            return
+
+        new_id = simpledialog.askinteger(
+            "Change Node ID",
+            f"Enter new ID for node {old_id}:",
+            parent=self,
+            minvalue=1
+        )
+
+        if new_id is None or new_id == old_id:
+            return
+
+        if new_id in nodes:
+            messagebox.showerror("Error", f"Node ID {new_id} is already in use.", parent=self)
+            return
+
+        self.push_undo()
+
+        # Move the node data to the new ID
+        nodes[new_id] = nodes.pop(old_id)
+
+        # Update all references to the old ID across all nodes
+        for nid, data in nodes.items():
+            options_changed = False
+            
+            # 1. Update the parsed options list
+            for opt in data.get("options", []):
+                next_val = opt.get("next")
+                if next_val is None: continue
+
+                if isinstance(next_val, str) and "/" in next_val:
+                    parts = [p.strip() for p in next_val.split("/")]
+                    if str(old_id) in parts:
+                        new_parts = [str(new_id) if p == str(old_id) else p for p in parts]
+                        opt["next"] = "/".join(new_parts)
+                        options_changed = True
+                elif str(next_val) == str(old_id):
+                    opt["next"] = str(new_id)
+                    options_changed = True
+            
+            # 2. If references were found, regenerate the raw_options string to match
+            if options_changed:
+                data["raw_options"] = "\n".join([format_option_line(opt) for opt in data["options"]])
+
+        # Update START_NODE if it was the changed node
+        global START_NODE
+        if START_NODE == old_id:
+            START_NODE = new_id
+
+        # Update selection state
+        self.selected_node = new_id
+
+        self.redraw()
+        self.load_selected_into_inspector()
+
+    def duplicate_node(self, nid): # duplicate a node
+        new_id = max(nodes.keys()) + 1
+        data = nodes[nid].copy()
+        data["x"] += 20; data["y"] += 20  
+        nodes[new_id] = data
+        self.redraw()
+
+    def enter_connection_mode(self, nid): # enter 'connection' mode (clicking a node will connect the original selected node to that [node])
+        self.connection_source = nid
+        self.mode = "connect"  
+        self.canvas.config(cursor="cross")
+
+    def canvas_zoom(self, event): # do 'zoom'
+        if self.settings['disable_zooming'] == False:
+            x = self.canvas.canvasx(event.x)
+            y = self.canvas.canvasy(event.y)
+            factor = 1.1 if event.delta > 0 else 0.9
+            self.current_zoom *= factor
+
+            
+            self.canvas.scale("all", x, y, factor, factor)
+            #self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+
+            
+            for nid, txt_id in self.node_texts.items():
+                font_obj = self.node_base_fonts[nid]
+                new_size = max(6, int(BASE_FONT_SIZE * self.current_zoom))
+                font_obj.configure(size=new_size)
+                
+                if self.current_zoom < 0.6:
+                    self.canvas.itemconfig(txt_id, text=str(nid))
+                else:
+                    header = nodes[nid].get("header", "")
+                    self.canvas.itemconfig(txt_id, text=f"{nid}: {header}")
+        else:
+            pass
+            #self.reset_zoom() 
+
+    def reset_zoom(self): # resets zoom.
+        #if self.settings['disable_zoom'] == False: 
+        factor = 1.0 / self.current_zoom
+        self.current_zoom = 1.0
+        cx = self.canvas.canvasx(self.canvas.winfo_width() / 2)
+        cy = self.canvas.canvasy(self.canvas.winfo_height() / 2)
+        self.canvas.scale("all", cx, cy, factor, factor)
+        #self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+        for nid, font_obj in self.node_base_fonts.items():
+            font_obj.configure(size=BASE_FONT_SIZE)  
+        for nid, txt_id in self.node_texts.items():
+            header = nodes[nid].get("header", "")
+            self.canvas.itemconfig(txt_id, text=f"{nid}: {header}")
+    
+    def apply_preset_color(self, color: str): # apply preset color (in the inspector there's "Preset Colors".)
+        targets = self.multi_selected_nodes if self.multi_selected_nodes else {self.selected_node}
+        for nid in targets:
+            if nid is not None:
+                nodes[nid]["color"] = color
+        self.redraw()
+
+    def pick_node_color(self): # picks the node color
+        if self.selected_node is None:
+            return
+        node = nodes[self.selected_node]
+        color = colorchooser.askcolor(color=node.get("color","#222222"))[1]  
+        if color:
+            node["color"] = color
+            self.redraw()
+
+    def start_pan(self, event): # start panning
+        self.canvas.scan_mark(event.x, event.y)
+
+    def do_pan(self, event): # do panning
+        self.canvas.scan_dragto(event.x, event.y, gain=1)
+
+    def delete_selected_node(self): # delete the selected node
+        if self.selected_node is None:
+            #messagebox.showinfo("No node", "Select a node first.")
+            return
+        
+        if not self.settings.get("disable_delete_confirm", False):
+            if not messagebox.askyesno("Delete node", f"Delete node {self.selected_node}?"):
+                return
+
+        delete_node(self.selected_node)
+        self.selected_node = None
+        self.redraw()
+        self.clear_inspector()
+        self.update_node_count()        
+
+    def set_start_node(self): # set a node as the start node (the start node is the first node that appears in Play Mode)
+        global START_NODE
+        if self.selected_node is not None:
+            START_NODE = self.selected_node
+            #messagebox.showinfo("Start node", f"Start node set to {START_NODE}")
+    
+    def _apply_pending_inspector_edits(self):
+        if self.updating: return
+        
+        if self.selected_node is not None:
+            self.apply_edits(redraw_canvas=False)
+        elif self.selected_comment is not None:
+            self.apply_comment_edits(redraw_canvas=False)
+
+    def apply_edits(self, redraw_canvas=True): # apply edits for options_text and header_text
+        if self.selected_node is None:
+            return
+        
+        if self.selected_node not in nodes:
+            return
+
+        header = self.header_text.get("1.0", tk.END).strip()
+        opts_text = self.options_text.get("1.0", tk.END).strip()
+        
+        nodes[self.selected_node]["raw_options"] = opts_text # Store raw text to preserve comments
+
+        opts_raw = opts_text.splitlines()
+        opts = []
+        for line in opts_raw:
+            parsed = parse_option_line(line)
+            if parsed:
+                opts.append(parsed)
+
+        nodes[self.selected_node]["header"] = header
+        nodes[self.selected_node]["options"] = opts
+        if redraw_canvas:
+            self.redraw()
+
+    def apply_vars_text(self): # apply edits for vars_list
+        raw = self.vars_list.get("1.0", tk.END).strip().splitlines()
+        vars_store.clear(); inventory.clear()
+        for line in raw:
+            line = line.strip()
+            if not line: continue
+            if line.startswith("inv:"):
+                name = line.split(":",1)[1].strip()
+                if name: inventory.append(name)
+            else:
+                
+                if "=" in line:
+                    name, val = line.split("=",1)
+                    name=name.strip(); val=val.strip()
+                    if val.lower()=="true":
+                        parsed=True
+                    elif val.lower()=="false":
+                        parsed=False
+                    else:
+                        try:
+                            parsed=int(val)
+                        except Exception:
+                            try:
+                                parsed=float(val)
+                            except Exception:
+                                parsed = val.strip('"').strip("'")
+                    vars_store[name]=parsed
+        #messagebox.showinfo("Vars", "Vars & inventory applied.")
+
+    def quick_add_node(self, event=None, x=None, y=None):  
+        self._apply_pending_inspector_edits()
+        self.push_undo()
+
+        # Find the lowest available node ID
+        new_id = 1
+        while new_id in nodes:
+            new_id += 1
+
+        # Cursor position if event is provided
+        if event is not None:
+            x, y = self.canvas.canvasx(event.x), self.canvas.canvasy(event.y)
+        else:
+            # Fallback: center of canvas
+            if x is None or y is None:
+                w, h = self.canvas.winfo_width(), self.canvas.winfo_height()
+                x, y = self.canvas.canvasx(w / 2), self.canvas.canvasy(h / 2)
+
+        # Color logic
+        if self.settings.get('udtdnc', False) == False:
+            color = '#222222'
+        else:
+            color = self.theme['default_node_color']
+
+        # Create node
+        nodes[new_id] = {
+            "x": x,
+            "y": y,
+            "header": f"Node {new_id}",
+            "options": [],
+            "color": color     
+        }
+
+        self.selected_node = new_id
+        self.load_selected_into_inspector()
+        self.redraw()
+        self.update_node_count()
+
+    def truncate_text_to_fit(self, text, font, max_w, max_h):
+        if self.settings.get('disable_text_truncation', False):
+            return text
+
+        linespace = font.metrics("linespace")
+        max_lines = max(1, int(max_h / linespace))
+        
+        final_lines = []
+        truncated = False
+
+        paragraphs = text.split('\n')
+        for paragraph in paragraphs:
+            if len(final_lines) >= max_lines:
+                truncated = True
+                break
+
+            words = paragraph.split(' ')
+            current_line = ""
+            
+            for word in words:
+                if not word:
+                    continue
+
+                # If the word itself is too long, it must be broken down.
+                if font.measure(word) > max_w:
+                    # Finish the current line before dealing with the long word
+                    if current_line:
+                        if len(final_lines) < max_lines:
+                            final_lines.append(current_line)
+                        else:
+                            truncated = True; break
+                    current_line = "" # Reset for after the long word
+
+                    # Break the long word into fitting parts
+                    temp_word = word
+                    while temp_word:
+                        if len(final_lines) >= max_lines:
+                            truncated = True; break
+                        
+                        split_idx = len(temp_word)
+                        for i in range(1, len(temp_word) + 1):
+                            if font.measure(temp_word[:i]) > max_w:
+                                split_idx = i - 1
+                                break
+                        
+                        split_idx = max(1, split_idx)
+                        final_lines.append(temp_word[:split_idx])
+                        temp_word = temp_word[split_idx:]
+                    if truncated: break
+                    continue # The long word is fully processed, move to the next word
+
+                # Normal word wrapping
+                test_line = (current_line + " " + word).strip() if current_line else word
+                if font.measure(test_line) <= max_w:
+                    current_line = test_line
+                else:
+                    if len(final_lines) < max_lines:
+                        final_lines.append(current_line)
+                        current_line = word
+                    else:
+                        truncated = True; break
+            
+            if truncated: break
+
+            # Add the last line of the paragraph
+            if current_line:
+                if len(final_lines) < max_lines:
+                    final_lines.append(current_line)
+                else:
+                    truncated = True
+
+        # Final truncation and ellipsis logic
+        if len(final_lines) > max_lines:
+            final_lines = final_lines[:max_lines]
+            truncated = True
+        
+        if truncated and final_lines:
+            last_line = final_lines[-1]
+            
+            if not last_line.endswith("..."):
+                while font.measure(last_line + "...") > max_w and last_line:
+                    last_line = last_line[:-1]
+                final_lines[-1] = (last_line + "...") if last_line else "..."
+
+        return "\n".join(final_lines)
+
+    def clear_comment_handles(self, cid):
+        data = comments.get(cid)
+        if not data:
+            return
+        handles = data.get("handles") or {}
+        for hid in list(handles.values()):
+            try:
+                self.canvas.delete(hid)
+            except Exception:
+                pass
+        data["handles"] = {}
+
+    def redraw(self):
+        # Clear all existing edges
+        for item in self.edge_items:
+            self.canvas.delete(item)
+        self.edge_items.clear()
+
+        # Clear all existing node rectangles and texts, then re-create only for existing nodes
+        for nid in list(self.node_rects.keys()): # Iterate over a copy of keys to allow modification
+            if nid not in nodes:
+                self.canvas.delete(self.node_rects.pop(nid, None))
+                self.canvas.delete(self.node_texts.pop(nid, None))
+                self.node_base_fonts.pop(nid, None)
+
+        # --- Update or create nodes ---
+        for nid, data in nodes.items():
+            x = data.get("x", 50)
+            y = data.get("y", 50)
+            node_color = data.get("color") or self.theme.get('default_node_color', '#222222')
+
+            # Node rectangle
+            if nid in self.node_rects:
+                self.canvas.coords(self.node_rects[nid], x, y, x + NODE_W, y + NODE_H)
+                self.canvas.itemconfig(self.node_rects[nid], fill=node_color)
+            else:
+                rect = self.canvas.create_rectangle(
+                    x, y, x + NODE_W, y + NODE_H,
+                    fill=node_color, outline=self.theme['node_outline'], width=2,
+                    tags=("node", str(nid))
+                )
+                self.node_rects[nid] = rect
+
+            # Node text
+            font_obj = self.node_base_fonts.get(nid) or tkFont.Font(family="TkDefaultFont", size=11)
+            self.node_base_fonts[nid] = font_obj
+            full_text = f"{nid}: {data.get('header','')}"
+            display_text = self.truncate_text_to_fit(full_text, font_obj, NODE_W-12, NODE_H-4)
+
+            if nid in self.node_texts:
+                self.canvas.itemconfig(self.node_texts[nid], text=display_text, fill=self.theme['node_text_fill'])
+                self.canvas.coords(self.node_texts[nid], x + 10, y + 10)
+            else:
+                txt = self.canvas.create_text(
+                    x + 10, y + 10, anchor="nw",
+                    text=display_text,
+                    fill=self.theme['node_text_fill'],
+                    width=NODE_W - 12,
+                    font=font_obj,
+                    tags=("node_text", str(nid))
+                )
+                self.node_texts[nid] = txt
+
+            # Selection outlines
+            if nid == self.selected_node:
+                self.canvas.itemconfig(self.node_rects[nid], outline=self.theme['node_selected_outline'], width=3)
+            elif nid in self.multi_selected_nodes:
+                self.canvas.itemconfig(self.node_rects[nid], outline=self.theme['multi_selected_outline'], width=3)
+            else:
+                self.canvas.itemconfig(self.node_rects[nid], outline=self.theme['node_outline'], width=2)
+
+        # --- Update edges ---
+        # (The clearing of old edges is moved to the beginning of the function)
+        seen_edges = set()
+        COLOR1 = self.theme.get('from_lines', '#00ced1')
+        COLOR2 = self.theme.get('to_lines', '#ffa500')
+        RANDOM_EDGE_COLOR = self.theme.get('randomEdgeFromColor', '#8e44ff')
+
+        for nid, data in nodes.items():
+            x1 = data.get("x", 50) + NODE_W // 2
+            y1 = data.get("y", 50) + NODE_H // 2
+            for opt in data.get("options", []):
+                nxt_raw = opt.get("next")
+                if not nxt_raw:
+                    continue
+                is_multi_choice = isinstance(nxt_raw, str) and "/" in nxt_raw
+                next_nodes = []
+
+                if isinstance(nxt_raw, str) and "/" in nxt_raw:
+                    for part in nxt_raw.split("/"):
+                        try:
+                            next_nodes.append(int(part.strip()))
+                        except:
+                            val = vars_store.get(part.strip())
+                            if val is not None:
+                                try: next_nodes.append(int(val))
+                                except: pass
+                else:
+                    try:
+                        next_nodes.append(int(nxt_raw))
+                    except:
+                        val = vars_store.get(nxt_raw)
+                        if val is not None:
+                            try: next_nodes.append(int(val))
+                            except: pass
+
+                for tgt in next_nodes:
+                    if tgt not in nodes or (nid, tgt) in seen_edges:
+                        continue
+                    x2 = nodes[tgt].get("x", 50) + NODE_W // 2
+                    y2 = nodes[tgt].get("y", 50) + NODE_H // 2
+
+                    reverse_exists = False
+                    for ropt in nodes[tgt].get("options", []):
+                        rnext = ropt.get("next")
+                        if rnext is None: continue
+                        if isinstance(rnext, str) and "/" in rnext:
+                            if str(nid) in [p.strip() for p in rnext.split("/")]:
+                                reverse_exists = True
+                                break
+                        else:
+                            if str(nid) == str(rnext):
+                                reverse_exists = True
+                                break
+
+                    from_color = RANDOM_EDGE_COLOR if is_multi_choice else COLOR1
+                    if reverse_exists:
+                        line = self.canvas.create_line(x1, y1, x2, y2, width=3, fill=from_color, smooth=True)
+                        self.edge_items.append(line)
+                        self.canvas.tag_lower(line)
+                        seen_edges.add((nid, tgt))
+                        seen_edges.add((tgt, nid))
+                    else:
+                        mid_x = (x1 + x2) / 2
+                        mid_y = (y1 + y2) / 2
+                        line1 = self.canvas.create_line(x1, y1, mid_x, mid_y, width=3, fill=from_color, smooth=True)
+                        line2 = self.canvas.create_line(mid_x, mid_y, x2, y2, width=3, fill=COLOR2, smooth=True, arrow=tk.LAST)
+                        self.edge_items.extend([line1, line2])
+                        self.canvas.tag_lower(line1)
+                        self.canvas.tag_lower(line2)
+                        seen_edges.add((nid, tgt))
+
+        # --- Update comments ---
+
+        # Clear stale handles from previous frame so they don't accumulate
+        for cid in list(comments.keys()):
+            self.clear_comment_handles(cid)
+
+        # Clear canvas items for comments that no longer exist
+        for cid_item in list(self.comment_rects.keys()):
+            if cid_item not in comments:
+                self.canvas.delete(self.comment_rects.pop(cid_item, None))
+                self.canvas.delete(self.comment_texts.pop(cid_item, None))
+
+        # --- Update comments ---
+        for cid, data in comments.items():
+            x, y = data["x"], data["y"]
+            w, h = max(30, data.get("w", COMMENT_W)), max(20, data.get("h", COMMENT_H))
+            data["w"], data["h"] = w, h
+
+            # Rectangle (reuse if exists)
+            if cid in getattr(self, "comment_rects", {}):
+                self.canvas.coords(self.comment_rects[cid], x, y, x + w, y + h)
+            else:
+                if not hasattr(self, "comment_rects"):
+                    self.comment_rects = {}
+                rect_id = self.canvas.create_rectangle(
+                    x, y, x + w, y + h,
+                    fill="#FFA500", outline="#FFCC66", width=2,
+                    tags=("comment", str(cid))
+                )
+                self.comment_rects[cid] = rect_id
+
+            # Text (truncated)
+            font_obj = tkFont.Font(family="Arial", size=10)
+            display_text = self.truncate_text_to_fit(data.get("text",""), font_obj, w-10, h-10)
+
+            if cid in getattr(self, "comment_texts", {}):
+                self.canvas.itemconfig(self.comment_texts[cid], text=display_text)
+                self.canvas.coords(self.comment_texts[cid], x + 5, y + 5)
+            else:
+                if not hasattr(self, "comment_texts"):
+                    self.comment_texts = {}
+                text_id = self.canvas.create_text(
+                    x + 5, y + 5, anchor="nw", text=display_text,
+                    font=font_obj, width=w-10, fill="#333333",
+                    tags=("comment_text", str(cid))
+                )
+                self.comment_texts[cid] = text_id
+
+            # Create handles only for the selected comment
+            if cid == self.selected_comment:
+                handles = {}
+                # Handles are created relative to the comment's current position and size
+                handles["nw"] = self.canvas.create_rectangle(x-HANDLE_SIZE, y-HANDLE_SIZE, x+HANDLE_SIZE, y+HANDLE_SIZE, fill="#222", tags=(f"handle_{cid}", "nw"))
+                handles["ne"] = self.canvas.create_rectangle(x+w-HANDLE_SIZE, y-HANDLE_SIZE, x+w+HANDLE_SIZE, y+HANDLE_SIZE, fill="#222", tags=(f"handle_{cid}", "ne"))
+                handles["sw"] = self.canvas.create_rectangle(x-HANDLE_SIZE, y+h-HANDLE_SIZE, x+HANDLE_SIZE, y+h+HANDLE_SIZE, fill="#222", tags=(f"handle_{cid}", "sw"))
+                handles["se"] = self.canvas.create_rectangle(x+w-HANDLE_SIZE, y+h-HANDLE_SIZE, x+w+HANDLE_SIZE, y+h+HANDLE_SIZE, fill="#222", tags=(f"handle_{cid}", "se"))
+                data["handles"] = handles
+            else:
+                # ensure no handles stored for unselected comments
+                data["handles"] = {}
+
+    def select_comment(self, event): # selects a comment
+        x, y = self.canvas.canvasx(event.x), self.canvas.canvasy(event.y)
+        for cid, data in comments.items():
+            w, h = data.get("w", COMMENT_W), data.get("h", COMMENT_H)
+            if data["x"] <= x <= data["x"] + w and data["y"] <= y <= data["y"] + h:
+                self.selected_comment = cid
+                self.load_comment_into_inspector()
+                break
+
+    def load_comment_into_inspector(self):
+        if self.selected_comment is None: 
+            return
+        comment = comments[self.selected_comment]
+        self.header_text.delete("1.0", tk.END)
+        self.header_text.insert(tk.END, comment["text"])
+
+    def apply_comment_edits(self, redraw_canvas=True): # apply comment edits to the comment
+        if self.selected_comment is None: return
+        comments[self.selected_comment]["text"] = self.header_text.get("1.0", tk.END).strip()
+        if redraw_canvas:
+            self.redraw()
+
+    def get_node_at(self, x, y): # gets node at (usually at mouse)
+        scale = self.current_zoom
+        for nid, data in nodes.items():
+            nx, ny = data.get("x", 50) * scale, data.get("y", 50) * scale
+            if nx <= x <= nx + NODE_W * scale and ny <= y <= ny + NODE_H * scale:
+                return nid
+        return None
+
+    def start_resize(self, event): # start resizing (comment)
+        self.resizing_comment = None
+        self.resize_dir = None
+
+        # convert mouse coords to canvas coords
+        x, y = self.canvas.canvasx(event.x), self.canvas.canvasy(event.y)
+
+        # Check if clicked on handle
+        clicked = self.canvas.find_overlapping(x, y, x, y)
+        for item in clicked:
+            for t in self.canvas.gettags(item):
+                if t.startswith("handle_"):
+                    self.resizing_comment = int(t.split("_")[1])
+                    for dir_tag in ("nw","ne","sw","se"):
+                        if dir_tag in self.canvas.gettags(item):
+                            self.resize_dir = dir_tag
+                            break
+
+        if self.resizing_comment:
+            self.resize_start = (x, y)  # canvas coords
+            comment = comments[self.resizing_comment]
+            self.orig_pos = (comment["x"], comment["y"], comment["w"], comment["h"])
+
+    def do_resize(self, event): # do resizing (comment)
+        if not self.resizing_comment: return
+
+        # convert mouse coords to canvas coords
+        x, y = self.canvas.canvasx(event.x), self.canvas.canvasy(event.y)
+        dx = x - self.resize_start[0]
+        dy = y - self.resize_start[1]
+
+        cid = self.resizing_comment
+        x0, y0, w, h = self.orig_pos
+        comment = comments[cid]
+
+        if "nw" in self.resize_dir:
+            new_w = max(w - dx, MIN_W)
+            new_h = max(h - dy, MIN_H)
+            comment["x"] = x0 + (w - new_w)
+            comment["y"] = y0 + (h - new_h)
+            comment["w"] = new_w
+            comment["h"] = new_h
+        elif "ne" in self.resize_dir:
+            new_w = max(w + dx, MIN_W)
+            new_h = max(h - dy, MIN_H)
+            comment["y"] = y0 + (h - new_h)
+            comment["w"] = new_w
+            comment["h"] = new_h
+        elif "sw" in self.resize_dir:
+            new_w = max(w - dx, MIN_W)
+            new_h = max(h + dy, MIN_H)
+            comment["x"] = x0 + (w - new_w)
+            comment["w"] = new_w
+            comment["h"] = new_h
+        elif "se" in self.resize_dir:
+            new_w = max(w + dx, MIN_W)
+            new_h = max(h + dy, MIN_H)
+            comment["w"] = new_w
+            comment["h"] = new_h
+
+        self.redraw()
+
+    def stop_resize(self, event): # stop resizing (comment)
+        self.resizing_comment = None
+        self.resize_dir = None
+
+    def canvas_mouse_down(self, event): # called on mouse_down
+        self._apply_pending_inspector_edits()
+        cx, cy = self.canvas.canvasx(event.x), self.canvas.canvasy(event.y)
+        clicked_node = self.get_node_at(cx, cy)
+
+        self.selected_comment = None
+        self.dragging_comment = False
+        
+        # Check if clicked on a comment
+        for cid, c in comments.items():
+            if c["x"] <= cx <= c.get("x", 0) + c.get("w", 150) and c["y"] <= cy <= c.get("y", 0) + c.get("h", 50):
+                self.selected_comment = cid
+                self.dragging_comment = True
+                self.comment_offset = (cx - c["x"], cy - c["y"])
+                self.selected_node = None        # deselect any node
+                self.multi_selected_nodes.clear()  # clear multi-selection
+                self.load_comment_into_inspector()
+                self.redraw()
+                return
+
+        if getattr(self, "mode", None) == "disconnect" and hasattr(self, "disconnect_source"):
+            if clicked_node is not None and clicked_node != self.disconnect_source:
+                src_opts = nodes[self.disconnect_source]["options"]
+                self.push_undo()  
+                nodes[self.disconnect_source]["options"] = [
+                    o for o in src_opts if resolve_next(o.get("next")) != clicked_node
+                ]
+                self.redraw()
+                self.load_selected_into_inspector()
+            self.mode = "editor"
+            self.disconnect_source = None
+            self.canvas.config(cursor="")
+            return
+        
+        if getattr(self, "mode", None) == "connect" and hasattr(self, "connection_source"):
+            source = self.connection_source
+            target = clicked_node
+            if target is not None and target != source:
+                self.push_undo()  
+                nodes[source]["options"].append({
+                    "text": "Placeholder",
+                    "next": str(target),
+                    "condition": "",
+                    "actions": []
+                })
+                self.selected_node = source
+                self.load_selected_into_inspector()
+                self.redraw()
+            self.mode = "editor"
+            self.connection_source = None
+            self.canvas.config(cursor="")
+            return
+
+        if clicked_node:
+            self.selected_node = clicked_node
+            self.dragging = True
+
+            if clicked_node in self.multi_selected_nodes:
+                
+                self.dragging_multi = True
+                self.drag_offsets_multi = {
+                    nid: (cx - nodes[nid]["x"], cy - nodes[nid]["y"])
+                    for nid in self.multi_selected_nodes
+                }
+            else:
+                
+                self.dragging_multi = False
+                node_x, node_y = nodes[clicked_node].get("x", 50), nodes[clicked_node].get("y", 50)
+                self.drag_offset = (cx - node_x, cy - node_y)
+                self.multi_selected_nodes.clear()
+            self.push_undo()
+            self.load_selected_into_inspector()
+            self.redraw()
+        else:
+            self.selected_node = None
+            self.selected_comment = None
+            self.multi_selected_nodes.clear()
+            self.dragging_multi = False
+            self.clear_inspector(True)
+            self.redraw()
+
+    def on_close(self):
+        try:
+            self.close_play()   # cleanup play mode
+        except Exception:
+            pass
+        self.destroy()          # actually close the main window
+
+    def add_comment(self, text="New comment", event=None, x=None, y=None):  
+        self.push_undo()
+        global comments
+
+        # Cursor position if event is provided
+        if event is not None:
+            x, y = self.canvas.canvasx(event.x), self.canvas.canvasy(event.y)
+        else:
+            # Fallback: center of canvas
+            if x is None or y is None:
+                w, h = self.canvas.winfo_width(), self.canvas.winfo_height()
+                x, y = self.canvas.canvasx(w / 2), self.canvas.canvasy(h / 2)
+
+        cid = max(comments.keys(), default=0) + 1
+        width = self.settings.get('default_comment_w', COMMENT_W)
+        height = self.settings.get('default_comment_h', COMMENT_H)
+        comments[cid] = {
+            "text": text,
+            "x": x,
+            "y": y,
+            "w": width,
+            "h": height
+        }
+        self.selected_comment = cid
+        self.redraw()
+
+    def start_comment_action(self, event): # start comment action
+        x, y = self.canvas.canvasx(event.x), self.canvas.canvasy(event.y)
+        clicked = self.canvas.find_overlapping(x, y, x, y)
+        self.active_comment = None
+        self.resizing_comment = None
+
+        for item in clicked:
+            tags = self.canvas.gettags(item)
+            for t in tags:
+                if t.startswith("handle_"):
+                    self.resizing_comment = int(t.split("_")[1])
+                    for dir_tag in ("nw","ne","sw","se"):
+                        if dir_tag in tags:
+                            self.resize_dir = dir_tag
+                            break
+                    break
+                elif t.startswith("comment"):
+                    self.active_comment = int(t[7:])  # 'comment' + id
+                    self.move_start = (x, y)
+                    c = comments[self.active_comment]
+                    self.orig_pos = (c["x"], c["y"])
+                    break
+            if self.active_comment or self.resizing_comment:
+                break
+
+    def canvas_mouse_move(self, event): # called on mouse_move
+        cx, cy = self.canvas.canvasx(event.x), self.canvas.canvasy(event.y)
+        scale = self.current_zoom
+
+        # comment drag first
+        if getattr(self, "dragging_comment", False) and self.selected_comment is not None:
+            if getattr(self, "resizing_comment", None) is None:  # only drag if NOT resizing
+                ox, oy = self.comment_offset
+                comments[self.selected_comment]["x"] = cx - ox
+                comments[self.selected_comment]["y"] = cy - oy
+                self.redraw()
+            return
+
+        if not getattr(self, "dragging", False) or (self.selected_node is None and not self.dragging_multi):
+            return
+
+        if getattr(self, "dragging_multi", False):
+            for nid, (ox, oy) in self.drag_offsets_multi.items():
+                nodes[nid]["x"] = int((cx - ox) / scale)
+                nodes[nid]["y"] = int((cy - oy) / scale)
+        elif self.selected_node is not None:
+            ox, oy = self.drag_offset
+            nodes[self.selected_node]["x"] = int((cx - ox) / scale)
+            nodes[self.selected_node]["y"] = int((cy - oy) / scale)
+
+        self.redraw()
+
+    def canvas_mouse_up(self, event): # called on mouse_up
+        self.dragging_comment = False
+        self.dragging = False
+
+    def load_selected_into_inspector(self): # load selected node into inspector
+        if self.selected_node is None:
+            return
+        data = nodes.get(self.selected_node)
+        if not data:
+            return
+        self.id_label.config(text=f"ID: {self.selected_node}")
+        self.header_text.delete("1.0", tk.END); self.header_text.insert(tk.END, data.get("header",""))
+        self.options_text.delete("1.0", tk.END)
+        # If raw_options exists, use it to preserve comments. Otherwise, format from parsed options.
+        if "raw_options" in data:
+            self.options_text.insert(tk.END, data.get("raw_options", ""))
+        else:
+            for opt in data.get("options",[]):
+                self.options_text.insert(tk.END, format_option_line(opt) + "\n")
+        
+        self._schedule_highlight()
+        
+        self.vars_list.delete("1.0", tk.END)
+        for k,v in vars_store.items():
+            self.vars_list.insert(tk.END, f"{k}={v}\n")
+        if inventory:
+            for it in inventory:
+                self.vars_list.insert(tk.END, f"inv:{it}\n")
+
+    def clear_inspector(self, keepVarsList: bool=False): # clear inspector (keepVarsList is usually True)
+        self.id_label.config(text="ID: -")
+        self.header_text.delete("1.0", tk.END)
+        self.options_text.delete("1.0", tk.END)
+        self._schedule_highlight()
+        if keepVarsList == False:
+            self.vars_list.delete("1.0", tk.END)
+
+    def save_story_dialog(self): # save story 
+        os.makedirs("./saves", exist_ok=True)
+        save_name = simpledialog.askstring("Save Name", "Enter save name:", initialvalue="my_story")
+        if not save_name:
+            return
+        path = f"./saves/{save_name}.json"
+        if os.path.exists(path):
+            if not messagebox.askyesno("Overwrite?", f"{save_name}.json already exists. Overwrite?"):
+                return
+        payload = {"nodes": nodes, "vars": vars_store, "inventory": inventory, "start": START_NODE}
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(payload, f, indent=2)
+        messagebox.showinfo("Saved", f"Saved to {path}")
+
+    def load_story_dialog(self): # load story
+        path = filedialog.askopenfilename(filetypes=[("JSON","*.json")])
+        if not path:
+            return
+        with open(path, "r", encoding="utf-8") as f:
+            payload = json.load(f)
+        
+        global nodes, vars_store, inventory, START_NODE
+        nodes = {int(k): v for k,v in payload.get("nodes",{}).items()}
+        vars_store = payload.get("vars", {})
+        inventory[:] = payload.get("inventory", [])
+        START_NODE = payload.get("start", START_NODE)
+        
+        for nid, v in nodes.items():
+            v.setdefault("x", 50 + (nid%5)*60)
+            v.setdefault("y", 50 + (nid%7)*40)
+            v.setdefault("options", v.get("options", []))
+        messagebox.showinfo("Loaded", f"Loaded {path}")
+        self.selected_node = None
+        self.redraw()
+        self.update_node_count()
+        self.selected_node = 1
+        self.load_selected_into_inspector()
+
+    def toggle_mode(self): # toggle mode (play>editor, editor>play)
+        if self.mode == "editor":
+            self.enter_play_mode()
+        else:
+            self.enter_editor_mode()
+
+    def enter_play_mode(self): # enter play mode
+        # Backup the editor's variable state before starting play mode
+        self._apply_pending_inspector_edits() # Ensure globals are up-to-date with UI
+        self.editor_vars_backup = copy.deepcopy(vars_store)
+        self.editor_inventory_backup = inventory.copy()
+        self.nodes_backup = copy.deepcopy(nodes)
+
+        self.mode = "play"
+        self.mode_button.configure(text="Switch to Editor Mode")
+        self.reset_state()
+        self.play_window = tk.Toplevel(self.master)
+        self.play_window.title("Play Mode")
+        self.play_window.geometry("480x360")
+
+        self.play_window.protocol("WM_DELETE_WINDOW", self.close_play)       
+
+        tk.Label(self.play_window, text=f"Play Mode").pack()
+        self.play_area = tk.Frame(self.play_window)
+        self.play_area.pack(fill=tk.BOTH, expand=True)
+        self.play_header = tk.Label(self.play_area, text="", wraplength=440, justify="left", font=("TkDefaultFont", 11))
+        self.play_header.pack(pady=(10,5))
+        self.choice_frame = tk.Frame(self.play_area)
+        self.choice_frame.pack(pady=(6,10))
+        ctrl = tk.Frame(self.play_window)
+        ctrl.pack(fill=tk.X)
+        tk.Button(ctrl, text="Restart", command=self.play_restart).pack(side=tk.LEFT)
+        self.play_current = START_NODE
+        self.play_path = []
+        self.play_render_current()
+
+    def enter_editor_mode(self): # enter editor mode
+        global vars_store, inventory, nodes
+        self.mode = "editor"
+        self.mode_button.configure(text="Switch to Play Mode")
+
+        # Restore the editor's variable state from backup and nodes incase headers have been changed
+        if self.editor_vars_backup is not None:
+            vars_store = self.editor_vars_backup
+            self.editor_vars_backup = None
+        if self.editor_inventory_backup is not None:
+            inventory = self.editor_inventory_backup
+            self.editor_inventory_backup = None
+        if self.nodes_backup is not None:
+            nodes = self.nodes_backup
+            self.nodes_backup = None
+
+        try:
+            self.play_window.destroy()
+        except Exception:
+            pass
+
+        # Refresh the inspector to show the restored values
+        self.load_selected_into_inspector()
+
+    def close_play(self): # close play
+        # Cancel any pending timer job when closing the play window
+        if hasattr(self, 'play_timer_job') and self.play_timer_job:
+            self.after_cancel(self.play_timer_job)
+            self.play_timer_job = None
+
+        # Cancel any pending choice-level lifetime jobs
+        if hasattr(self, 'play_lifetime_jobs'):
+            for job in self.play_lifetime_jobs:
+                self.after_cancel(job)
+            self.play_lifetime_jobs = []
+            self.lifetime_start_times = {}
+
+        self.enter_editor_mode()
+
+    def reset_state(self): # reset state (variables and inventory for play mode)
+        vars_store.clear()
+        inventory.clear()
+        defaults = self.vars_list.get("1.0", tk.END).strip().splitlines()
+        for line in defaults:
+            line = line.strip()
+            if not line:
+                continue
+            if line.startswith("inv:"):
+                item = line.split(":", 1)[1].strip()
+                if item:
+                    inventory.append(item)
+            elif "=" in line:
+                name, val = line.split("=", 1)
+                name, val = name.strip(), val.strip()
+                try:
+                    vars_store[name] = safe_eval_expr(val, vars_store)
+                except Exception:
+                    vars_store[name] = val
+
+    def play_restart(self): # restart the play [mode] session
+        # Cancel any pending timer job on restart
+        if hasattr(self, 'play_timer_job') and self.play_timer_job:
+            self.after_cancel(self.play_timer_job)
+            self.play_timer_job = None
+
+        # Cancel any pending choice-level lifetime jobs
+        if hasattr(self, 'play_lifetime_jobs'):
+            for job in self.play_lifetime_jobs:
+                self.after_cancel(job)
+            self.play_lifetime_jobs = []
+            self.lifetime_start_times = {}
+
+        self.reset_state()
+        self.play_current = START_NODE; self.play_path = []; self.play_render_current()
+
+    @staticmethod
+    def substitute_vars(text: str) -> str: # substitute variables, used for inline variable support such as "Clicks: {CLICKS}" ({CLICKS} gets replaced with the variable 'CLICKS' if it exists)
+        if not text:
+            return ""
+        def repl(match):
+            key = match.group(1)
+            return str(vars_store.get(key, f"{{{key}}}"))
+        return re.sub(r"\{(\w+)\}", repl, text)
+ 
+    def play_render_current(self):
+            # Cancel any pending timer from the previous node
+            if hasattr(self, 'play_timer_job') and self.play_timer_job:
+                self.after_cancel(self.play_timer_job)
+                self.play_timer_job = None
+
+            # On new node, reset lifetime timers
+            if not hasattr(self, 'last_rendered_node') or self.last_rendered_node != self.play_current:
+                if hasattr(self, 'play_lifetime_jobs'):
+                    for job in self.play_lifetime_jobs:
+                        self.after_cancel(job)
+                    self.play_lifetime_jobs = []
+                if hasattr(self, 'lifetime_start_times'):
+                    self.lifetime_start_times = {}
+                self.last_rendered_node = self.play_current
+
+            # Run instant leaves
+            self.play_current = run_instant_leaves(self.play_current)
+
+            if self.play_current not in nodes:
+                if self.settings.get('show_path', True):
+                    self.play_header.config(
+                        text=f"[END] Node {self.play_current} not found. Path: {' -> '.join(map(str,self.play_path))}"
+                    )
+                else:
+                    self.play_header.config(text=f"[END] Node {self.play_current} not found.")
+                for w in self.choice_frame.winfo_children():
+                    w.destroy()
+                return
+
+            node = nodes[self.play_current]
+            self.play_path.append(self.play_current)
+
+            # substitute variables in header
+            self.play_header.config(text=self.substitute_vars(node.get("header", "")))
+
+            # Scan for and set up a node-level timer
+            for opt_raw in node.get("options", []):
+                opt = parse_option_line(opt_raw)
+                if opt and opt.get("instant") and "timer" in opt:
+                    seconds = opt.get("timer")
+                    actions = opt.get("actions", [])
+                    sep = opt.get("separator", ">")
+                    if seconds and actions:
+                        # Schedule the timer to fire after N seconds
+                        self.play_timer_job = self.after(
+                            seconds * 1000,
+                            lambda a=actions, s=sep: self._execute_timed_action(a, s)
+                        )
+                        break  # Only one timer per node is supported
+
+                        # Gather visible leaves
+
+            visible = []
+
+            # Use enumerate() to get the index of each option
+            for i, opt_raw in enumerate(node.get("options", [])):
+                opt = parse_option_line(opt_raw)
+                if not opt or opt.get("instant"):
+                    continue
+                cond_str = opt.get("condition", "") or ""
+
+                # Handle lifetime(N) condition
+                lifetime_match = re.search(r'lifetime\((\d+)\)', cond_str)
+                if lifetime_match:
+                    lifetime_seconds = int(lifetime_match.group(1))
+
+                    key = (self.play_current, i)
+                    
+                    start_time = self.lifetime_start_times.get(key)
+                    if start_time:
+                        if time.time() - start_time >= lifetime_seconds:
+                            continue # This choice has expired
+                    else:
+                        # First time seeing this choice in this node, start its timer
+                        self.lifetime_start_times[key] = time.time()
+                        job = self.after(lifetime_seconds * 1000, self.play_render_current)
+                        self.play_lifetime_jobs.append(job)
+                    
+                    cond_str = cond_str[:lifetime_match.start()] + cond_str[lifetime_match.end():]
+                        
+                cond_parts = [p.strip() for p in re.split(r'[&;]', cond_str) if p.strip()]
+                
+                other_conds = []
+                chance_passed = True
+                
+                for part in cond_parts:
+                    if part.startswith('chance(') and part.endswith(')'):
+                        try:
+                            chance_val = float(part[7:-1])
+                            if random.uniform(0, 100) > chance_val:
+                                chance_passed = False
+                                break # This chance failed, no need to check others for this leaf
+                        except (ValueError, IndexError):
+                            pass # Invalid chance() syntax, treat as no condition
+                    else:
+                        other_conds.append(part)
+                
+                if not chance_passed:
+                    continue # Skip this leaf entirely
+
+                remaining_cond = " & ".join(other_conds)
+                
+                if evaluate_condition(remaining_cond, node):
+                    visible.append(opt)
+
+            for w in self.choice_frame.winfo_children():
+                w.destroy()
+
+            if not visible:
+                ctk.CTkLabel(self.choice_frame, text="[THE END]").pack()
+
+                if self.settings.get("show_path", True):
+                    ctk.CTkLabel(
+                        self.choice_frame,
+                        text="Path: " + " -> ".join(map(str, self.play_path))
+                    ).pack()
+
+                ctk.CTkButton(
+                    self.choice_frame, text="Play Again", command=self.play_restart, width=120, height=30
+                ).pack(pady=(6, 0))
+
+                ctk.CTkButton(
+                    self.choice_frame, text="Close Play", command=self.close_play, width=120, height=30
+                ).pack(pady=(6, 0))
+
+                return
+
+            for opt in visible:
+                opt_text = self.substitute_vars(opt.get("text", "choice"))
+                btn = tk.Button(
+                    self.choice_frame,
+                    text=opt_text,
+                    width=50,
+                    anchor="w",
+                    command=lambda o=opt: self.play_pick(o)
+                )
+                btn.pack(pady=2)
+                
+    def _execute_timed_action(self, actions: List[str], sep: str = ">"):
+        if not hasattr(self, 'play_window') or not self.play_window.winfo_exists():
+            return
+
+        self.play_timer_job = None  # Clear job ref
+
+        current_node = nodes.get(self.play_current)
+        if current_node:
+            for act in actions:
+                handle_action_with_separators(act, sep, current_node)
+
+        if "__goto" in vars_store:
+            nxt = resolve_next(vars_store.pop("__goto"))
+            if nxt is not None:
+                self.play_current = nxt
+                self.play_render_current()
+        else:
+            self.play_render_current()
+
+    def play_pick(self, opt):
+            # A choice was picked, so cancel any active timer.
+            if hasattr(self, 'play_timer_job') and self.play_timer_job:
+                self.after_cancel(self.play_timer_job)
+                self.play_timer_job = None
+
+            # Cancel any pending choice-level lifetime jobs
+            if hasattr(self, 'play_lifetime_jobs'):
+                for job in self.play_lifetime_jobs:
+                    self.after_cancel(job)
+                self.play_lifetime_jobs = []
+                # No need to clear lifetime_start_times here, it's handled by play_render_current on node change
+
+            # Get the current node data
+            current_node = nodes.get(self.play_current)
+            if current_node:
+                # Execute actions associated with the chosen option, passing the current node
+                execute_actions(opt.get("actions", []), current_node)
+
+            nxt = resolve_next(opt.get("next"))
+            if nxt is None:
+                self.play_header.config(text="[THE END]")
+                for w in self.choice_frame.winfo_children():
+                    w.destroy()
+                tk.Button(self.choice_frame, text="Play Again", command=self.play_restart).pack(pady=(6,0))
+                tk.Button(self.choice_frame, text="Close Play", command=self.close_play).pack(pady=(6,0))
+                return
+
+            # run instant leaves in the next node (cascading)
+            self.play_current = run_instant_leaves(nxt)
+            self.play_render_current()
+            
+    def build_example(self): # builds an example scene
+        nodes.clear(); vars_store.clear(); inventory.clear()
+
+        node_color = self.theme.get('default_node_color', '#222222')
+
+        create_node(1, "You were met with a fork in the path.", x=60, y=80, options=[
+            {"text":"Go left", "next":"2", "condition":None, "actions":[]},
+            {"text":"Go right", "next":"3", "condition":None, "actions":[]}
+        ], color=node_color)
+        create_node(2, "You find a river blocking your path.", x=300, y=80, options=[
+            {"text":"Swim across", "next":"4", "condition":None, "actions":["set:wet=True"]},
+            {"text":"Turn back", "next":"1", "condition":None, "actions":[]}
+        ], color=node_color)
+        create_node(3, "You encounter a sleeping dragon.", x=300, y=240, options=[
+            {"text":"Sneak past", "next":"4", "condition":None, "actions":[]},
+            {"text":"Attack it", "next":"5", "condition":"has_item:sword", "actions":[]}
+        ], color=node_color)
+        create_node(4, "You made it to a small village. The end.", x=540, y=150, options=[], color=node_color)
+        create_node(5, "The dragon wakes up and roasts you. Oops.", x=540, y=280, options=[], color=node_color)
+        inventory.append("rope")
+        vars_store["mysterious_path"] = 7
+        self.update_node_count()
+        self.redraw()
+
+def main():
+    root = tk.Tk()
+    root.geometry("1200x700")
+    app = VisualEditor(root)
+    root.mainloop()
+
+if __name__ == "__main__":
+    main()
