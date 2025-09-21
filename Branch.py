@@ -1,8 +1,11 @@
 """ 
 Branch, a CYOA (Choose-Your-Own-Adventure) Maker.
-Version: v0.5.14
+Version: v0.5.15
 
 Changelog:
+@ v0.5.15 -
+    * Small UI update, mostly in Play Mode.
+
 @ v0.5.14 -
     * Bugfixes (@timer fix)
     * @timer now allows decimal seconds such as "@timer(0.1)"
@@ -39,7 +42,7 @@ Changelog:
 
 ...
 """
-VERSION = 'v0.5.14'
+VERSION = 'v0.5.15'
 
 # built-ins
 import os, re, ast, math, json, copy, random, operator, time
@@ -1506,10 +1509,6 @@ class VisualEditor(tk.Frame):
             self.title_lbl.config(bg=self.theme['title_lbl_bg'])
             self.inspector_frame.config(bg=self.theme['inspector_frame_bg'])
             self.toolbar.configure(bg_color=self.theme['inspector_bg'], fg_color=self.theme['inspector_bg'])     
-            self.focus_canvas_btn.configure(fg_color=self.theme['inspector_bg'], text_color=self.theme['node_text_fill'], hover_color=self.theme['default_node_color'])
-            self.mode_button.configure(fg_color=self.theme['inspector_bg'], text_color=self.theme['node_text_fill'], hover_color=self.theme['default_node_color'])
-            self.settings_btn.configure(fg_color=self.theme['inspector_bg'], text_color=self.theme['node_text_fill'], hover_color=self.theme['default_node_color'])
-            self.tc_btn.configure(fg_color=self.theme['inspector_bg'], text_color=self.theme['node_text_fill'], hover_color=self.theme['default_node_color'])
             self.search_entry.configure(fg_color=self.theme['inspector_bg'], border_color=self.theme['inspector_button_bg'], text_color=self.theme['node_text_fill'])
             #self.versiondisp.configure(text_color=self.theme['node_text_fill'])
             #self.node_count_label.configure(text_color=self.theme['node_text_fill'])
@@ -1533,11 +1532,28 @@ class VisualEditor(tk.Frame):
                         child.configure(bg=self.theme.get("inspector_body", "#313244"))
                     elif isinstance(child, tk.Canvas):
                         child.configure(bg=self.theme.get("inspector_canvas_bg", "#2e2e3e"))
-
+                    elif isinstance(child, ctk.CTkButton):
+                        child.configure(
+                            fg_color=self.theme['inspector_bg'],
+                            text_color=self.theme['node_text_fill'],
+                            hover_color=self.theme['default_node_color']
+                        )
                     # Recurse
                     apply_theme_recursive(child)
 
+            def apply_theme_recursive_btns(widget):
+                for child in widget.winfo_children():
+                    if isinstance(child, ctk.CTkButton):
+                        child.configure(
+                            fg_color=self.theme['inspector_bg'],
+                            text_color=self.theme['node_text_fill'],
+                            hover_color=self.theme['default_node_color']
+                        )
+                    # recurse properly
+                    apply_theme_recursive_btns(child)
+                        
             apply_theme_recursive(self.inspector)
+            apply_theme_recursive_btns(self.root)
             
             if self.settings['change_node_colors']:
                 self.change_every_node_color(self.theme.get('default_node_color', '#222222'))
@@ -3120,10 +3136,9 @@ class VisualEditor(tk.Frame):
             self.enter_play_mode()
         else:
             self.enter_editor_mode()
-
+    
     def enter_play_mode(self): # enter play mode
-        # Backup the editor's variable state before starting play mode
-        self._apply_pending_inspector_edits() # Ensure globals are up-to-date with UI
+        self._apply_pending_inspector_edits()
         self.editor_vars_backup = copy.deepcopy(vars_store)
         self.editor_inventory_backup = inventory.copy()
         self.nodes_backup = copy.deepcopy(nodes)
@@ -3131,22 +3146,52 @@ class VisualEditor(tk.Frame):
         self.mode = "play"
         self.mode_button.configure(text="Switch to Editor Mode")
         self.reset_state()
-        self.play_window = tk.Toplevel(self.master)
+
+        dark_bg = "#424242"
+
+        self.play_window = tk.Toplevel(self.master, bg=dark_bg)
         self.play_window.title("Play Mode")
         self.play_window.geometry("480x360")
-
         self.play_window.protocol("WM_DELETE_WINDOW", self.close_play)       
 
-        tk.Label(self.play_window, text=f"Play Mode").pack()
-        self.play_area = tk.Frame(self.play_window)
+        tk.Label(
+            self.play_window,
+            text="Play Mode",
+            bg=dark_bg,  # same as parent = fake transparency
+            fg="white"
+        ).pack()
+
+        self.play_area = tk.Frame(self.play_window, bg=dark_bg)
         self.play_area.pack(fill=tk.BOTH, expand=True)
-        self.play_header = tk.Label(self.play_area, text="", wraplength=440, justify="left", font=("TkDefaultFont", 11))
+
+        self.play_header = tk.Label(
+            self.play_area,
+            text="",
+            wraplength=440,
+            justify="left",
+            font=("TkDefaultFont", 11),
+            bg=dark_bg,
+            fg="white"
+        )
         self.play_header.pack(pady=(10,5))
-        self.choice_frame = tk.Frame(self.play_area)
+
+        self.choice_frame = tk.Frame(self.play_area, bg=dark_bg)
         self.choice_frame.pack(pady=(6,10))
-        ctrl = tk.Frame(self.play_window)
+
+        ctrl = tk.Frame(self.play_window, bg=dark_bg)
         ctrl.pack(fill=tk.X)
-        tk.Button(ctrl, text="Restart", command=self.play_restart).pack(side=tk.LEFT)
+
+        tk.Button(
+            ctrl,
+            text="Restart",
+            command=self.play_restart,
+            bg=dark_bg,   # match parent = fake transparency
+            fg="white",
+            activebackground="#5a5a5a",
+            activeforeground="white",
+            relief="flat"
+        ).pack(side=tk.LEFT)
+
         self.play_current = START_NODE
         self.play_path = []
         self.play_render_current()
@@ -3234,144 +3279,162 @@ class VisualEditor(tk.Frame):
             key = match.group(1)
             return str(vars_store.get(key, f"{{{key}}}"))
         return re.sub(r"\{(\w+)\}", repl, text)
- 
+    
     def play_render_current(self):
-            # Cancel any pending timer from the previous node
-            if hasattr(self, 'play_timer_job') and self.play_timer_job:
-                self.after_cancel(self.play_timer_job)
-                self.play_timer_job = None
+        # Cancel any pending timer from the previous node
+        if hasattr(self, 'play_timer_job') and self.play_timer_job:
+            self.after_cancel(self.play_timer_job)
+            self.play_timer_job = None
 
-            # On new node, reset lifetime timers
-            if not hasattr(self, 'last_rendered_node') or self.last_rendered_node != self.play_current:
-                if hasattr(self, 'play_lifetime_jobs'):
-                    for job in self.play_lifetime_jobs:
-                        self.after_cancel(job)
-                    self.play_lifetime_jobs = []
-                if hasattr(self, 'lifetime_start_times'):
-                    self.lifetime_start_times = {}
-                self.last_rendered_node = self.play_current
+        # On new node, reset lifetime timers
+        if not hasattr(self, 'last_rendered_node') or self.last_rendered_node != self.play_current:
+            if hasattr(self, 'play_lifetime_jobs'):
+                for job in self.play_lifetime_jobs:
+                    self.after_cancel(job)
+                self.play_lifetime_jobs = []
+            if hasattr(self, 'lifetime_start_times'):
+                self.lifetime_start_times = {}
+            self.last_rendered_node = self.play_current
 
-            # Run instant leaves
-            self.play_current = run_instant_leaves(self.play_current)
+        # Run instant leaves
+        self.play_current = run_instant_leaves(self.play_current)
 
-            if self.play_current not in nodes:
-                if self.settings.get('show_path', True):
-                    self.play_header.config(
-                        text=f"[END] Node {self.play_current} not found. Path: {' -> '.join(map(str,self.play_path))}"
-                    )
-                else:
-                    self.play_header.config(text=f"[END] Node {self.play_current} not found.")
-                for w in self.choice_frame.winfo_children():
-                    w.destroy()
-                return
-
-            node = nodes[self.play_current]
-            self.play_path.append(self.play_current)
-
-            # substitute variables in header
-            self.play_header.config(text=self.substitute_vars(node.get("header", "")))
-
-            # Scan for and set up a node-level timer
-            for opt_raw in node.get("options", []):
-                opt = parse_option_line(opt_raw)
-                if opt and opt.get("instant") and "timer" in opt:
-                    seconds = opt.get("timer")
-                    actions = opt.get("actions", [])
-                    sep = opt.get("separator", ">")
-                    if seconds and actions:
-                        # Schedule the timer to fire after N seconds
-                        self.play_timer_job = self.after(int(seconds * 1000),
-                            lambda a=actions, s=sep: self._execute_timed_action(a, s))
-                        break  # Only one timer per node is supported
-
-                        # Gather visible leaves
-
-            visible = []
-
-            # Use enumerate() to get the index of each option
-            for i, opt_raw in enumerate(node.get("options", [])):
-                opt = parse_option_line(opt_raw)
-                if not opt or opt.get("instant"):
-                    continue
-                cond_str = opt.get("condition", "") or ""
-
-                # Handle lifetime(N) condition
-                lifetime_match = re.search(r'lifetime\((\d+)\)', cond_str)
-                if lifetime_match:
-                    lifetime_seconds = int(lifetime_match.group(1))
-
-                    key = (self.play_current, i)
-                    
-                    start_time = self.lifetime_start_times.get(key)
-                    if start_time:
-                        if time.time() - start_time >= lifetime_seconds:
-                            continue # This choice has expired
-                    else:
-                        # First time seeing this choice in this node, start its timer
-                        self.lifetime_start_times[key] = time.time()
-                        job = self.after(lifetime_seconds * 1000, self.play_render_current)
-                        self.play_lifetime_jobs.append(job)
-                    
-                    cond_str = cond_str[:lifetime_match.start()] + cond_str[lifetime_match.end():]
-                        
-                cond_parts = [p.strip() for p in re.split(r'[&;]', cond_str) if p.strip()]
-                
-                other_conds = []
-                chance_passed = True
-                
-                for part in cond_parts:
-                    if part.startswith('chance(') and part.endswith(')'):
-                        try:
-                            chance_val = float(part[7:-1])
-                            if random.uniform(0, 100) > chance_val:
-                                chance_passed = False
-                                break # This chance failed, no need to check others for this leaf
-                        except (ValueError, IndexError):
-                            pass # Invalid chance() syntax, treat as no condition
-                    else:
-                        other_conds.append(part)
-                
-                if not chance_passed:
-                    continue # Skip this leaf entirely
-
-                remaining_cond = " & ".join(other_conds)
-                
-                if evaluate_condition(remaining_cond, node):
-                    visible.append(opt)
-
+        if self.play_current not in nodes:
+            if self.settings.get('show_path', True):
+                self.play_header.configure(
+                    text=f"[END] Node {self.play_current} not found. Path: {' -> '.join(map(str,self.play_path))}"
+                )
+            else:
+                self.play_header.configure(text=f"[END] Node {self.play_current} not found.")
             for w in self.choice_frame.winfo_children():
                 w.destroy()
+            return
 
-            if not visible:
-                ctk.CTkLabel(self.choice_frame, text="[THE END]").pack()
+        node = nodes[self.play_current]
+        self.play_path.append(self.play_current)
 
-                if self.settings.get("show_path", True):
-                    ctk.CTkLabel(
-                        self.choice_frame,
-                        text="Path: " + " -> ".join(map(str, self.play_path))
-                    ).pack()
+        # substitute variables in header
+        self.play_header.configure(text=self.substitute_vars(node.get("header", "")))
 
-                ctk.CTkButton(
-                    self.choice_frame, text="Play Again", command=self.play_restart, width=120, height=30
-                ).pack(pady=(6, 0))
+        # Scan for and set up a node-level timer
+        for opt_raw in node.get("options", []):
+            opt = parse_option_line(opt_raw)
+            if opt and opt.get("instant") and "timer" in opt:
+                seconds = opt.get("timer")
+                actions = opt.get("actions", [])
+                sep = opt.get("separator", ">")
+                if seconds and actions:
+                    self.play_timer_job = self.after(
+                        int(seconds * 1000),
+                        lambda a=actions, s=sep: self._execute_timed_action(a, s)
+                    )
+                    break  # Only one timer per node is supported
 
-                ctk.CTkButton(
-                    self.choice_frame, text="Close Play", command=self.close_play, width=120, height=30
-                ).pack(pady=(6, 0))
+        # Gather visible leaves
+        visible = []
+        for i, opt_raw in enumerate(node.get("options", [])):
+            opt = parse_option_line(opt_raw)
+            if not opt or opt.get("instant"):
+                continue
+            cond_str = opt.get("condition", "") or ""
 
-                return
+            # Handle lifetime(N) condition
+            lifetime_match = re.search(r'lifetime\((\d+)\)', cond_str)
+            if lifetime_match:
+                lifetime_seconds = int(lifetime_match.group(1))
+                key = (self.play_current, i)
 
-            for opt in visible:
-                opt_text = self.substitute_vars(opt.get("text", "choice"))
-                btn = tk.Button(
+                start_time = self.lifetime_start_times.get(key)
+                if start_time:
+                    if time.time() - start_time >= lifetime_seconds:
+                        continue
+                else:
+                    self.lifetime_start_times[key] = time.time()
+                    job = self.after(lifetime_seconds * 1000, self.play_render_current)
+                    self.play_lifetime_jobs.append(job)
+
+                cond_str = cond_str[:lifetime_match.start()] + cond_str[lifetime_match.end():]
+
+            cond_parts = [p.strip() for p in re.split(r'[&;]', cond_str) if p.strip()]
+            other_conds = []
+            chance_passed = True
+
+            for part in cond_parts:
+                if part.startswith('chance(') and part.endswith(')'):
+                    try:
+                        chance_val = float(part[7:-1])
+                        if random.uniform(0, 100) > chance_val:
+                            chance_passed = False
+                            break
+                    except (ValueError, IndexError):
+                        pass
+                else:
+                    other_conds.append(part)
+
+            if not chance_passed:
+                continue
+
+            remaining_cond = " & ".join(other_conds)
+            if evaluate_condition(remaining_cond, node):
+                visible.append(opt)
+
+        # clear old choices
+        for w in self.choice_frame.winfo_children():
+            w.destroy()
+
+        # end screen
+        if not visible:
+            ctk.CTkLabel(self.choice_frame, text="[THE END]").pack(pady=(4, 2))
+
+            if self.settings.get("show_path", True):
+                ctk.CTkLabel(
                     self.choice_frame,
-                    text=opt_text,
-                    width=50,
-                    anchor="w",
-                    command=lambda o=opt: self.play_pick(o)
-                )
-                btn.pack(pady=2)
-                
+                    text="Path: " + " -> ".join(map(str, self.play_path))
+                ).pack(pady=(0, 6))
+
+            ctk.CTkButton(
+                self.choice_frame,
+                text="Play Again",
+                command=self.play_restart,
+                width=100,      
+                height=28,     
+                fg_color="#1e1e1e",  
+                hover_color="#333333",  
+                text_color="white",   
+                corner_radius=6         
+            ).pack(pady=(6, 0))
+
+            ctk.CTkButton(
+                self.choice_frame,
+                text="Close Play",
+                command=self.close_play,
+                width=100,
+                height=28,
+                fg_color="#1e1e1e",
+                hover_color="#333333",
+                text_color="white",
+                corner_radius=6
+            ).pack(pady=(6, 0))
+
+
+            return
+
+        # visible choices
+        for opt in visible:
+            opt_text = self.substitute_vars(opt.get("text", "choice"))
+            ctk.CTkButton(
+                self.choice_frame,
+                text=opt_text,
+                anchor="w",
+                command=lambda o=opt: self.play_pick(o),
+                width=100,      
+                height=28,     
+                fg_color="#1e1e1e",  
+                hover_color="#333333",  
+                text_color="white",   
+                corner_radius=6      
+            ).pack(pady=2)
+        
     def _execute_timed_action(self, actions: List[str], sep: str = ">"):
         if not hasattr(self, 'play_window') or not self.play_window.winfo_exists():
             return
