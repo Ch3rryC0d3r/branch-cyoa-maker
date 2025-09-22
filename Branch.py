@@ -8,13 +8,14 @@ Changelog:
         - "Save" (Ctrl+S) now overwrites the last saved/loaded project instead of asking every time.
         - Added "Save As..." option to pick a new file path.
         - Added "New Story" button to clear current project and reset file path.
-    * Added non-blocking toast notifications (replacing messagebox popups):
-        - Toasts appear in bottom-center by default, fade in/out, and disappear after a few seconds.
-        - Multiple toasts now stack automatically instead of overlapping.
-        - Added `color` argument for toasts (e.g., red for errors, green for success).
-        - Added helper wrappers: `show_error`, `show_success`, `show_info` for consistent styling.
-    * Replaced blocking `messagebox.showinfo/showerror` calls with toasts for a smoother workflow.
-
+    * Added non-blocking toast notifications (replacing messagebox popups).
+    * Window Title Update:
+        - Titlebar now shows current project name (e.g., "Branch — my_story.json").
+    * Autosave System:
+        - New setting: "Enable Autosave" (on/off).
+        - New setting: "Autosave Time" (seconds, min 30).
+        - If enabled and project has a file, autosave runs on interval.
+        
 @ v0.5.15 -
     * Small UI update, mostly in Play Mode.
 
@@ -669,7 +670,10 @@ DEFAULT_SETTINGS = {
     },
     "default_comment_w": 150,
     "default_comment_h": 50,
-    'disable_text_truncation': False
+    'disable_text_truncation': False,
+    "autosave_enabled": True,
+    "autosave_time": 300,  # in seconds (5 min default)
+    
 }
 
 class VisualEditor(tk.Frame):
@@ -787,6 +791,8 @@ class VisualEditor(tk.Frame):
         # default settings
         self.settings = DEFAULT_SETTINGS.copy()
         self.load_settings() # load settings if path settings.json exists
+        self.schedule_autosave()
+
 
         self.settings_btn = ctk.CTkButton(self.toolbar, text="Settings", command=self.open_settings, width=90, height=25, fg_color="gray25", hover_color="gray35")
         self.settings_btn.pack(side='left')
@@ -998,12 +1004,42 @@ class VisualEditor(tk.Frame):
         self.master.bind("<Control-Shift-Z>", lambda e: self.redo())
         self.master.bind("<Control-y>", lambda e: self.redo())
 
+    def schedule_autosave(self):
+        if self.settings.get("autosave_enabled", True):
+            interval = max(30, int(self.settings.get("autosave_time", 300)))  # min 30s
+            self.after(interval * 1000, self.autosave)
+            
+    def autosave(self):
+        global CURRENT_FILE
+        if CURRENT_FILE:  # only if project has a file
+            try:
+                data = {
+                    "nodes": nodes,
+                    "vars_store": vars_store,
+                    "inventory": inventory
+                }
+                with open(CURRENT_FILE, "w", encoding="utf-8") as f:
+                    json.dump(data, f, indent=2)
+                self.show_toast(f"Autosaved {os.path.basename(CURRENT_FILE)}", color="green")
+            except Exception as e:
+                self.show_toast(f"Autosave failed: {e}", color="red")
+        self.schedule_autosave()  # reschedule
+
     def new_story(self):
         global CURRENT_FILE
         if messagebox.askyesno("New Story", "Start a new story? Unsaved changes will be lost."):
             nodes.clear(); vars_store.clear(); inventory.clear()
             CURRENT_FILE = None  # reset file path
             self.redraw()
+        self.update_title()                
+
+    def update_title(self):
+        global CURRENT_FILE
+        if CURRENT_FILE:
+            name = os.path.basename(CURRENT_FILE)
+            self.master.title(f"Branch — {name}")
+        else:
+            self.master.title("Branch — New Story")
 
     def apply_comment_text(self):
         if self.selected_comment is None:
@@ -1638,7 +1674,28 @@ class VisualEditor(tk.Frame):
                 self.apply_keybinds()
 
             tk.Button(keybind_frame, text="Apply", command=save_bind).grid(row=i, column=2, sticky='e', padx=4, pady=2)
-                
+
+        # Autosave Settings
+        tk.Label(win, text="Autosave (seconds):").pack(anchor="w", padx=4, pady=(10,0))
+        autosave_var = tk.StringVar(value=str(self.settings.get("autosave_time", 300)))
+        autosave_entry = tk.Entry(win, textvariable=autosave_var)
+        autosave_entry.pack(anchor="w", padx=4)
+
+        def save_autosave():
+            try:
+                val = int(autosave_var.get())
+                self.settings["autosave_time"] = max(30, val)  # enforce min 30s
+            except:
+                self.settings["autosave_time"] = 300
+
+        tk.Button(win, text="Apply", command=save_autosave).pack(anchor="w", padx=4, pady=(2,8))
+
+        autosave_enabled_var = tk.BooleanVar(value=self.settings.get("autosave_enabled", True))
+        chk_autosave = tk.Checkbutton(win, text="Enable Autosave", variable=autosave_enabled_var,
+                                    command=lambda: self.settings.update({"autosave_enabled": autosave_enabled_var.get()}))
+        chk_autosave.pack(anchor="w", pady=2, padx=4)
+
+
     def is_valid_action(self, s: str) -> bool:
         s = s.strip()
         if not s: return True
@@ -3152,6 +3209,8 @@ class VisualEditor(tk.Frame):
             self.show_toast(f"Saved to {filepath}")
         except Exception as e:
             self.show_toast("Failed to save!", color="red")
+        self.update_title()
+
 
     def save_as_dialog(self):
         global CURRENT_FILE
@@ -3163,6 +3222,7 @@ class VisualEditor(tk.Frame):
             return
         CURRENT_FILE = filepath
         self.save_story_dialog()
+        self.update_title()
 
     def load_story_dialog(self):
         global CURRENT_FILE
@@ -3187,6 +3247,8 @@ class VisualEditor(tk.Frame):
         self.redraw()
         self.update_node_count()
         self.load_selected_into_inspector()
+        self.update_title()
+
 
     def toggle_mode(self): # toggle mode (play>editor, editor>play)
         if self.mode == "editor":
