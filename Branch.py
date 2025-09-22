@@ -715,7 +715,11 @@ class VisualEditor(tk.Frame):
         super().__init__(master)
         self.master.title("Branch -- Visual CYOA Editor") # title
         self.pack(fill=tk.BOTH, expand=True)
-        self.mode = "editor" # initalize mode
+        self.mode = "editor"
+        self.connection_source = None
+        self.disconnect_source = None
+        self.connecting_from = None  # track node we're connecting out of
+
         self.selected_node: Optional[int] = None
         self.dragging = False
         self.drag_offset = (0,0)
@@ -739,7 +743,7 @@ class VisualEditor(tk.Frame):
         self.resizing_comment = False
         self.comment_rects = {}
         self.comment_texts = {}
-        
+
         # load theme.json if existing, otherwise, load 'default' theme.
         if not os.path.exists(THEME_PATH):
             self.themepreset('default')
@@ -2119,11 +2123,18 @@ class VisualEditor(tk.Frame):
 
         self.redraw()
 
-    def enter_disconnect_mode(self, nid): # opposite of 'enter_connection_mode()'.
-        self.disconnect_source = nid
+    def enter_connection_mode(self, source_node):
+        self.mode = "connect"
+        self.connection_source = source_node
+        self.canvas.config(cursor="cross")
+        self.show_toast(f"Select a target node to connect from {source_node}", color="blue")
+
+    def enter_disconnect_mode(self, source_node):
         self.mode = "disconnect"
-        self.canvas.config(cursor="X_cursor")  
-        
+        self.disconnect_source = source_node
+        self.canvas.config(cursor="X_cursor")
+        self.show_toast(f"Select a target node to disconnect from {source_node}", color="orange")
+
     def node_right_click(self, event): # this is called when you right-click a node
         cx = self.canvas.canvasx(event.x)
         cy = self.canvas.canvasy(event.y)
@@ -2151,12 +2162,52 @@ class VisualEditor(tk.Frame):
         menu = tk.Menu(self, tearoff=0)
         menu.add_command(label="Change ID", command=lambda: self.change_node_id(clicked_node))
         menu.add_command(label="Duplicate", command=self.duplicate_multi_nodes)
-        menu.add_command(label="Connect", command=lambda: self.enter_connection_mode(clicked_node))
-        menu.add_command(label="Disconnect", command=lambda: self.enter_disconnect_mode(clicked_node))
+        # fix these later - sept 22, 2025.
+        #menu.add_command(label="Connect", command=lambda: self.enter_connection_mode(clicked_node))
+        #menu.add_command(label="Disconnect", command=lambda: self.enter_disconnect_mode(clicked_node))
+
         menu.add_command(label="Delete", command=self.delete_multi_nodes)
 
         menu.tk_popup(event.x_root, event.y_root)
         return "break"
+
+    def start_connect(self, node_id):
+        if self.connecting_from is None:
+            # first click: pick source
+            self.connecting_from = node_id
+            self.show_toast(f"Select a node to connect {node_id} ...", color="blue")
+        else:
+            # second click: pick target
+            if node_id == self.connecting_from:
+                self.show_toast("Cannot connect node to itself.", color="red")
+            else:
+                src = nodes[self.connecting_from]
+                if "connections" not in src:
+                    src["connections"] = []
+                if node_id not in src["connections"]:
+                    src["connections"].append(node_id)
+                    self.show_toast(f"Connected {self.connecting_from} > {node_id}", color="green")
+                else:
+                    self.show_toast(f"Already connected {self.connecting_from} > {node_id}", color="yellow")
+
+            self.connecting_from = None
+            self.redraw()
+
+    def disconnect_node(self, node_id):
+        # must have a source selected
+        if self.connecting_from is None:
+            self.connecting_from = node_id
+            self.show_toast(f"Select a node to disconnect from {node_id}", color="blue")
+        else:
+            src = nodes.get(self.connecting_from)
+            if src and "connections" in src and node_id in src["connections"]:
+                src["connections"].remove(node_id)
+                self.show_toast(f"Disconnected {self.connecting_from} > {node_id}", color="red")
+            else:
+                self.show_toast(f"No connection {self.connecting_from} > {node_id}", color="yellow")
+
+            self.connecting_from = None
+            self.redraw()
 
     def comment_right_click(self, event):
         cx = self.canvas.canvasx(event.x)
@@ -2351,11 +2402,6 @@ class VisualEditor(tk.Frame):
         data["x"] += 20; data["y"] += 20  
         nodes[new_id] = data
         self.redraw()
-
-    def enter_connection_mode(self, nid): # enter 'connection' mode (clicking a node will connect the original selected node to that [node])
-        self.connection_source = nid
-        self.mode = "connect"  
-        self.canvas.config(cursor="cross")
 
     def canvas_zoom(self, event): # do 'zoom'
         if self.settings['disable_zooming'] == False:
@@ -2944,24 +2990,25 @@ class VisualEditor(tk.Frame):
         if getattr(self, "mode", None) == "disconnect" and hasattr(self, "disconnect_source"):
             if clicked_node is not None and clicked_node != self.disconnect_source:
                 src_opts = nodes[self.disconnect_source]["options"]
-                self.push_undo()  
+                self.push_undo()
                 nodes[self.disconnect_source]["options"] = [
-                    o for o in src_opts if resolve_next(o.get("next")) != clicked_node
+                    o for o in src_opts if o.get("next") != str(clicked_node)
                 ]
                 self.redraw()
                 self.load_selected_into_inspector()
+                self.show_toast(f"Disconnected {self.disconnect_source} > {clicked_node}", color="red")
             self.mode = "editor"
             self.disconnect_source = None
             self.canvas.config(cursor="")
             return
-        
+
         if getattr(self, "mode", None) == "connect" and hasattr(self, "connection_source"):
             source = self.connection_source
             target = clicked_node
             if target is not None and target != source:
-                self.push_undo()  
+                self.push_undo()
                 nodes[source]["options"].append({
-                    "text": "Placeholder",
+                    "text": f"> {target}",
                     "next": str(target),
                     "condition": "",
                     "actions": []
@@ -2969,6 +3016,7 @@ class VisualEditor(tk.Frame):
                 self.selected_node = source
                 self.load_selected_into_inspector()
                 self.redraw()
+                self.show_toast(f"Connected {source} > {target}", color="green")
             self.mode = "editor"
             self.connection_source = None
             self.canvas.config(cursor="")
