@@ -353,7 +353,40 @@
         - ':<...>' Runs conditional actions inside '<...>', followed by unconditional actions after.
     * Fixed bug where '@ACT' instant actions wouldn't run due to missing argument in run_instant_leaves().
 </pre>
-    </details>         
+    </details>       
+    <details>
+      <summary>v0.5.12</summary>
+      <pre>    * Added 'rlet:N:L' action and 'hlet:N=L' condition. rlet is used to replace the Nth letter in header with L, hlet is returns True or False rather or not the Nth letter in the header is L.</pre>
+    </details>      
+    <details>
+      <summary>v0.5.11</summary>
+      <pre>    * Added node-level timers.
+    * Added choice-level timers.</pre>
+    </details>  
+    <details>
+      <summary>v0.5.10</summary>
+      <pre>    * Added Chanced-Based Visibility Leaves. (learn more about it with the leaves documentation)</pre>
+    </details>  
+    <details>
+      <summary>v0.5.09</summary>
+      <pre>    * In the node-right-click-menu, added a "Change ID" button.</pre>
+    </details>  
+    <details>
+      <summary>v0.5.08</summary>
+      <pre>    * Fixed "Variables & Inventory" to be default variable values, as intended.</pre>
+    </details>  
+    <details>
+      <summary>v0.5.07</summary>
+      <pre>    * Added `clamp(VAR:MIN,MAX)` action to constrain a variable within a numeric range.
+    * Added `consume(ITEM:ACTION)` shortcut to remove an item and then run an action.
+    * Updated documentation for new actions.</pre>
+    </details>  
+    <details>
+      <summary>v0.5.06</summary>
+      <pre>    * Added a new flexible 'if' statement syntax: `if(cond):<conditional_actions>unconditional_actions`.
+    * The colon and unconditional actions are optional, allowing for `if(cond)<conditional_actions>`.
+    * Updated documentation to reflect the new syntax.</pre>
+    </details>                            
   </section>
 </main>
 
