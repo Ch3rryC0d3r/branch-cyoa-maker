@@ -3240,42 +3240,41 @@ class VisualEditor(tk.Frame):
         )
         if not filepath:
             return
+
+        base, ext = os.path.splitext(filepath)
+        autosave_path = base + ".autosave.json"
+
+        # Decide which file to load
+        load_path = filepath
+        if os.path.exists(autosave_path):
+            if messagebox.askyesno(
+                "Autosave Found",
+                f"An autosave exists for {os.path.basename(filepath)}.\n\nLoad the autosave instead?"
+            ):
+                load_path = autosave_path
+
+        # Try loading
         try:
-            with open(filepath, "r", encoding="utf-8") as f:
+            with open(load_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
             nodes.clear(); nodes.update(data.get("nodes", {}))
             vars_store.clear(); vars_store.update(data.get("vars_store", {}))
             inventory.clear(); inventory.extend(data.get("inventory", []))
-            CURRENT_FILE = filepath  # <-- remember the file
+            CURRENT_FILE = filepath  # always point to the main file
+            self.selected_node = None
             self.redraw()
-            self.show_toast(f"Loaded {filepath}")
+            self.update_node_count()
+            self.load_selected_into_inspector()
+            self.update_title()
+
+            # Toast
+            if load_path == autosave_path:
+                self.show_toast(f"Loaded autosave for {os.path.basename(filepath)}", color="blue")
+            else:
+                self.show_toast(f"Loaded {filepath}")
 
         except Exception as e:
             self.show_toast(f"Failed to load: {e}", color="red")
-
-        base, ext = os.path.splitext(filepath)
-        autosave_path = base + ".autosave.json"
-        if os.path.exists(autosave_path):
-            if messagebox.askyesno("Autosave Found", f"An autosave exists for {os.path.basename(filepath)}.\n\nDo you want to load the autosave instead?"):
-                try:
-                    with open(autosave_path, "r", encoding="utf-8") as f:
-                        data = json.load(f)
-                    nodes.clear(); nodes.update(data.get("nodes", {}))
-                    vars_store.clear(); vars_store.update(data.get("vars_store", {}))
-                    inventory.clear(); inventory.extend(data.get("inventory", []))
-                    CURRENT_FILE = filepath
-                    self.redraw()
-                    self.show_toast(f"Loaded autosave for {os.path.basename(filepath)}", color="blue")
-                    return
-                except Exception as e:
-                    self.show_toast(f"Failed to load autosave: {e}", color="red")
-
-        self.selected_node = None
-        self.redraw()
-        self.update_node_count()
-        self.load_selected_into_inspector()
-        self.update_title()
-
 
     def toggle_mode(self): # toggle mode (play>editor, editor>play)
         if self.mode == "editor":
