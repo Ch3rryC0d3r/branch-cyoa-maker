@@ -15,7 +15,9 @@ Changelog:
         - New setting: "Enable Autosave" (on/off).
         - New setting: "Autosave Time" (seconds, min 30).
         - If enabled and project has a file, autosave runs on interval.
-        
+        - Autosaves are written to a separate ".autosave.json" file alongside the main project.
+        - On load, if an autosave exists, user is prompted to load it instead of the main file.        
+
 @ v0.5.15 -
     * Small UI update, mostly in Play Mode.
 
@@ -1018,11 +1020,18 @@ class VisualEditor(tk.Frame):
                     "vars_store": vars_store,
                     "inventory": inventory
                 }
-                with open(CURRENT_FILE, "w", encoding="utf-8") as f:
+                # make autosave path
+                base, ext = os.path.splitext(CURRENT_FILE)
+                autosave_path = base + ".autosave.json"
+
+                with open(autosave_path, "w", encoding="utf-8") as f:
                     json.dump(data, f, indent=2)
-                self.show_toast(f"Autosaved {os.path.basename(CURRENT_FILE)}", color="green")
+
+                self.show_toast(f"Autosaved : {os.path.basename(autosave_path)}", color="green")
+
             except Exception as e:
                 self.show_toast(f"Autosave failed: {e}", color="red")
+
         self.schedule_autosave()  # reschedule
 
     def new_story(self):
@@ -3243,6 +3252,24 @@ class VisualEditor(tk.Frame):
 
         except Exception as e:
             self.show_toast(f"Failed to load: {e}", color="red")
+
+        base, ext = os.path.splitext(filepath)
+        autosave_path = base + ".autosave.json"
+        if os.path.exists(autosave_path):
+            if messagebox.askyesno("Autosave Found", f"An autosave exists for {os.path.basename(filepath)}.\n\nDo you want to load the autosave instead?"):
+                try:
+                    with open(autosave_path, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                    nodes.clear(); nodes.update(data.get("nodes", {}))
+                    vars_store.clear(); vars_store.update(data.get("vars_store", {}))
+                    inventory.clear(); inventory.extend(data.get("inventory", []))
+                    CURRENT_FILE = filepath
+                    self.redraw()
+                    self.show_toast(f"Loaded autosave for {os.path.basename(filepath)}", color="blue")
+                    return
+                except Exception as e:
+                    self.show_toast(f"Failed to load autosave: {e}", color="red")
+
         self.selected_node = None
         self.redraw()
         self.update_node_count()
