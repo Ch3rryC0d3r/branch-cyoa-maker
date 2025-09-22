@@ -1,8 +1,20 @@
 """ 
 Branch, a CYOA (Choose-Your-Own-Adventure) Maker.
-Version: v0.5.15
+Version: v0.5.16
 
 Changelog:
+@ v0.5.16 -
+    * Added persistent save system:
+        - "Save" (Ctrl+S) now overwrites the last saved/loaded project instead of asking every time.
+        - Added "Save As..." option to pick a new file path.
+        - Added "New Story" button to clear current project and reset file path.
+    * Added non-blocking toast notifications (replacing messagebox popups):
+        - Toasts appear in bottom-center by default, fade in/out, and disappear after a few seconds.
+        - Multiple toasts now stack automatically instead of overlapping.
+        - Added `color` argument for toasts (e.g., red for errors, green for success).
+        - Added helper wrappers: `show_error`, `show_success`, `show_info` for consistent styling.
+    * Replaced blocking `messagebox.showinfo/showerror` calls with toasts for a smoother workflow.
+
 @ v0.5.15 -
     * Small UI update, mostly in Play Mode.
 
@@ -12,37 +24,14 @@ Changelog:
 
 @ v0.5.13 -
     * Expanded action syntax support: all [func]>[act] forms (such as repeat, once, @timer, chance, etc.) now accept '>>' and '<...>' variants, just like if-statements.
-        - '>' → Runs only the first action.
-        - '>>' → Runs all actions.
-        - ':<...>' → Runs conditional actions inside '<...>', followed by unconditional actions after.
+        - '>' Runs only the first action.
+        - '>>' Runs all actions.
+        - ':<...>' Runs conditional actions inside '<...>', followed by unconditional actions after.
     * Fixed bug where '@ACT' instant actions wouldn't run due to missing argument in run_instant_leaves().
-
-@ v0.5.12 -
-    * Added 'rlet:N:L' action and 'hlet:N=L' condition. rlet is used to replace the Nth letter in header with L, hlet is returns True or False rather or not the Nth letter in the header is L.
-
-@ v0.5.11 -
-    * Added node-level timers.
-    * Added choice-level timers.
-@ v0.5.10 - 
-    * Added Chanced-Based Visibility Leaves. (learn more about it with the leaves documentation)
-
-@ v0.5.09 -
-    * In the node-right-click-menu, added a "Change ID" button.
-
-@ v0.5.08 - 
-    * Fixed "Variables & Inventory" to be default variable values, as intended.
-
-@ v0.5.07 -
-    * Added `clamp(VAR:MIN,MAX)` action to constrain a variable within a numeric range.
-    * Added `consume(ITEM:ACTION)` shortcut to remove an item and then run an action.
-
-@ v0.5.06 - 
-    * Added a new flexible 'if' statement syntax: `if(cond):<conditional_actions>unconditional_actions`.
-    * The colon and unconditional actions are optional, allowing for `if(cond)<conditional_actions>`.
 
 ...
 """
-VERSION = 'v0.5.15'
+VERSION = 'v0.5.16'
 
 # built-ins
 import os, re, ast, math, json, copy, random, operator, time
@@ -84,7 +73,7 @@ def safe_eval_expr(expr: str, names: dict): # evaluates an expression safely
     def _eval(n):
         if isinstance(n, ast.Expression):
             return _eval(n.body)
-        if isinstance(n, ast.Constant): # for newer py (users)
+        if isinstance(n, ast.Constant):
             return n.value
         if isinstance(n, ast.BinOp):
             left = _eval(n.left)
@@ -149,6 +138,7 @@ START_NODE = 1 # default start node
 BASE_FONT_SIZE = 11 # font size
 SETTINGS_PATH = "./settings.json" # path for 'settings.json' (saves your in-app settings on exit)
 THEME_PATH = "./theme.json" # path for 'theme.json' (saves your in-app theme on exit)
+CURRENT_FILE = None 
 MIN_W, MIN_H = 30, 20 # minimum size for comments
 
 # A "LEAF" (it doesn't matter if it's uppercased) is simply a name for an option line in the Node Inspector.
@@ -174,9 +164,6 @@ def parse_option_line(line: Union[str, Dict]) -> Optional[Dict]:
             "actions": [acts.strip()],
             "separator": sep
         }
-
-
-
 
     # instant leaf (starts with @)
     if raw.startswith("@"):
@@ -754,6 +741,8 @@ class VisualEditor(tk.Frame):
             self.load_theme()          
         self.redo_stack = []
 
+        self.active_toasts = []
+
         # Toolbar definition
         self.toolbar = ctk.CTkFrame(self, bg_color='#ffffff', fg_color='#ffffff')
         self.toolbar.pack(side='top', fill='x')
@@ -805,6 +794,13 @@ class VisualEditor(tk.Frame):
         self.tc_btn = ctk.CTkButton(self.toolbar, text="Theme Control", command=self.open_themecontrol, width=90, height=25, fg_color="gray25", hover_color="gray35")
         self.tc_btn.pack(side='left')
 
+        self.new_story_btn = ctk.CTkButton(
+            self.toolbar, text="New Story",
+            command=self.new_story, width=90, height=25,
+            fg_color="gray25", hover_color="gray35"
+        )
+        self.new_story_btn.pack(side="left")
+
         self.versiondisp = ctk.CTkLabel(self.toolbar, text=f'{VERSION} |', text_color='#ffffff').pack(side='right')
 
         self.menubar = tk.Menu(self.master)
@@ -820,6 +816,7 @@ class VisualEditor(tk.Frame):
         self.app_menu.add_separator()
         self.app_menu.add_command(label="Clear all saves", command=self.clear_all_saves)
         self.app_menu.add_command(label="Save (Ctrl+S)", command=self.save_story_dialog)
+        self.app_menu.add_command(label="Save As...", command=self.save_as_dialog)
         self.app_menu.add_command(label="Load", command=self.load_story_dialog)
         self.app_menu.add_separator()
         self.app_menu.add_command(label="Quit", command=self.master.quit)
@@ -834,9 +831,6 @@ class VisualEditor(tk.Frame):
         self.canvas = tk.Canvas(canvas_frame, bg='#101010', width=900, height=600,
                                 scrollregion=(-100000,-100000,100000,100000))
         self.canvas.pack(fill=tk.BOTH, expand=True)
-
-        # Setup Controls
-        self.setup_controls()
 
         # Node Menu (right clicking on a node)
         self.node_menu = tk.Menu(self.canvas, tearoff=0)
@@ -955,8 +949,8 @@ class VisualEditor(tk.Frame):
         self.canvas.bind("<B1-Motion>", self.do_resize, add="+")
         self.canvas.bind("<ButtonRelease-1>", self.stop_resize, add="+")
         self.canvas.tag_bind("comment", "<Button-3>", self.comment_right_click)
-        self.canvas.bind("<ButtonPress-1>", self.start_canvas_or_comment, add="+")  # move comments
-        self.canvas.bind("<ButtonPress-1>", self.canvas_mouse_down, add="+")        # move nodes
+        self.canvas.bind("<ButtonPress-1>", self.start_canvas_or_comment, add="+")
+        self.canvas.bind("<ButtonPress-1>", self.canvas_mouse_down, add="+") 
         self.canvas.bind("<B1-Motion>", self.canvas_mouse_move, add="+")
         self.canvas.bind("<ButtonRelease-1>", self.canvas_mouse_up, add="+")
 
@@ -1003,6 +997,13 @@ class VisualEditor(tk.Frame):
         self.master.bind("<Control-z>", lambda e: self.undo())
         self.master.bind("<Control-Shift-Z>", lambda e: self.redo())
         self.master.bind("<Control-y>", lambda e: self.redo())
+
+    def new_story(self):
+        global CURRENT_FILE
+        if messagebox.askyesno("New Story", "Start a new story? Unsaved changes will be lost."):
+            nodes.clear(); vars_store.clear(); inventory.clear()
+            CURRENT_FILE = None  # reset file path
+            self.redraw()
 
     def apply_comment_text(self):
         if self.selected_comment is None:
@@ -1096,7 +1097,7 @@ class VisualEditor(tk.Frame):
                     "inspector_textbox_bg": "#f5f5f5",
                     "inspector_button_bg": "#a6e3a1",
 
-                    "syntax_keyword": "#c586c0", # magenta
+                    "syntax_keyword": "#c586c0",
                     "syntax_comment": "#6A9955",
                     "syntax_string": "#ce9178",
                     "syntax_number": "#b5cea8",
@@ -1135,7 +1136,7 @@ class VisualEditor(tk.Frame):
                     "inspector_textbox_bg": "#f5f5f5",
                     "inspector_button_bg": "#f38ba8",
 
-                    "syntax_keyword": "#f38ba8", # red
+                    "syntax_keyword": "#f38ba8",
                     "syntax_comment": "#7f849c",
                     "syntax_string": "#fab387",
                     "syntax_number": "#a6e3a1",
@@ -1174,7 +1175,7 @@ class VisualEditor(tk.Frame):
                     "inspector_textbox_bg": "#f5f5f5",
                     "inspector_button_bg": "#89b4fa",
 
-                    "syntax_keyword": "#cba6f7", # lavender
+                    "syntax_keyword": "#cba6f7",
                     "syntax_comment": "#7f849c",
                     "syntax_string": "#fab387",
                     "syntax_number": "#a6e3a1",
@@ -1213,7 +1214,7 @@ class VisualEditor(tk.Frame):
                     "inspector_textbox_bg": "#f5f5f5",
                     "inspector_button_bg": "#a6e3a1",
 
-                    "syntax_keyword": "#dfa00d", # dark yellow
+                    "syntax_keyword": "#dfa00d",
                     "syntax_comment": "#7f849c",
                     "syntax_string": "#fab387",
                     "syntax_number": "#a6e3a1",
@@ -1252,7 +1253,7 @@ class VisualEditor(tk.Frame):
                     "inspector_textbox_bg": "#f5f5f5",
                     "inspector_button_bg": "#cba6f7",
 
-                    "syntax_keyword": "#cba6f7", # lavender
+                    "syntax_keyword": "#cba6f7",
                     "syntax_comment": "#7f849c",
                     "syntax_string": "#fab387",
                     "syntax_number": "#a6e3a1",
@@ -1291,7 +1292,7 @@ class VisualEditor(tk.Frame):
                     "inspector_textbox_bg": "#f5f5f5",
                     "inspector_button_bg": "#f7a6e4",
 
-                    "syntax_keyword": "#f7a6e4", # pink
+                    "syntax_keyword": "#f7a6e4",
                     "syntax_comment": "#7f849c",
                     "syntax_string": "#fab387",
                     "syntax_number": "#a6e3a1",
@@ -1330,7 +1331,7 @@ class VisualEditor(tk.Frame):
                     "inspector_textbox_bg": "#f5f5f5",
                     "inspector_button_bg": "#cd853f",
 
-                    "syntax_keyword": "#cd853f", # peru
+                    "syntax_keyword": "#cd853f",
                     "syntax_comment": "#928374",
                     "syntax_string": "#d65d0e",
                     "syntax_number": "#b5cea8",
@@ -1369,13 +1370,13 @@ class VisualEditor(tk.Frame):
                     "inspector_textbox_bg": "#ffffff",
                     "inspector_button_bg": "#ffdb58",
 
-                    "syntax_keyword": "#4682b4", # steelblue
+                    "syntax_keyword": "#4682b4",
                     "syntax_comment": "#3b82f6",
                     "syntax_string": "#fb923c",
                     "syntax_number": "#34d399",
                     "syntax_variable": "#2563eb",
-                    "syntax_separator": "#6b7280", # grey
-                    "syntax_operator": "#6b7280", # grey
+                    "syntax_separator": "#6b7280",
+                    "syntax_operator": "#6b7280",
                     "syntax_error": "#ef4444",
 
                     "preset_canvas_bg": "#ffffff",
@@ -1447,7 +1448,7 @@ class VisualEditor(tk.Frame):
                     "inspector_textbox_bg": "#ffffff",
                     "inspector_button_bg": "#a3e635",
 
-                    "syntax_keyword": "#f97316", # orange
+                    "syntax_keyword": "#f97316",
                     "syntax_comment": "#ca8a04",
                     "syntax_string": "#2563eb",
                     "syntax_number": "#16a34a",
@@ -1566,25 +1567,6 @@ class VisualEditor(tk.Frame):
     def add_comment_prompt(self):
         self.add_comment()
 
-    def setup_controls(self):
-        self.pressed_keys = set()
-
-        self.canvas.focus_set()
-
-        self.canvas.bind("<KeyPress-w>", lambda e: self.pressed_keys.add("w"))
-        self.canvas.bind("<KeyRelease-w>", lambda e: self.pressed_keys.discard("w"))
-
-        self.canvas.bind("<KeyPress-a>", lambda e: self.pressed_keys.add("a"))
-        self.canvas.bind("<KeyRelease-a>", lambda e: self.pressed_keys.discard("a"))
-
-        self.canvas.bind("<KeyPress-s>", lambda e: self.pressed_keys.add("s"))
-        self.canvas.bind("<KeyRelease-s>", lambda e: self.pressed_keys.discard("s"))
-
-        self.canvas.bind("<KeyPress-d>", lambda e: self.pressed_keys.add("d"))
-        self.canvas.bind("<KeyRelease-d>", lambda e: self.pressed_keys.discard("d"))        
-
-        self.update_cam()
-
     def focus_canvas(self, event=None):
         try:
             self.canvas.confgure(takeFocus=1)
@@ -1597,20 +1579,6 @@ class VisualEditor(tk.Frame):
             self.push_undo()
             nodes.clear(); vars_store.clear(); inventory.clear()
             self.redraw()
-
-    def update_cam(self):
-        dx = dy = 0
-        step = 1
-
-        if "w" in self.pressed_keys: dy -= step
-        if "s" in self.pressed_keys: dy += step
-        if "a" in self.pressed_keys: dx -= step
-        if "d" in self.pressed_keys: dx += step
-
-        if dx or dy:
-            self.canvas.xview_scroll(dx, "units")
-            self.canvas.yview_scroll(dy, "units")
-        self.canvas.after(16, self.update_cam)
 
     def apply_keybinds(self):
         for seq in list(self.master.bind()):
@@ -1756,7 +1724,7 @@ class VisualEditor(tk.Frame):
         self.known_keywords = {
             'if', 'once', 'repeat', 'chance', 'weighted', 'randr', 'rands', 'goto',
             'add_item', 'remove_item', 'clearinv', 'set', 'not_has_item', 'has_item',
-            'clamp', 'consume', 'rlet'
+            'clamp', 'consume', 'rlet', 'hlet'
         }
         
         # Patterns for highlighting. Order matters.
@@ -1772,7 +1740,7 @@ class VisualEditor(tk.Frame):
         ]
         
         self.error_pattern = re.compile(r'\b([a-zA-Z_]+)(?=:)\b')
-        self.known_action_prefixes = {'add_item', 'remove_item', 'goto', 'once', 'repeat', 'set', 'var', 'has_item', 'not_has_item', 'weighted', 'randr', 'rands', 'clamp', 'consume', 'rlet'}
+        self.known_action_prefixes = {'add_item', 'remove_item', 'goto', 'once', 'repeat', 'set', 'var', 'has_item', 'not_has_item', 'weighted', 'randr', 'rands', 'clamp', 'consume', 'rlet', 'hlet'}
 
         # Bind events
         self.options_text.bind("<<Modified>>", self._schedule_highlight, add="+")
@@ -2213,16 +2181,16 @@ class VisualEditor(tk.Frame):
         from tkinter import messagebox
 
         if not os.path.exists("./saves"):
-            messagebox.showinfo("No saves", "The ./saves/ folder does not exist.")
+            self.show_toast("The ./saves/ folder does not exist.")
             return
 
         if messagebox.askyesno("Dangerous!", "This will delete EVERYTHING in ./saves/. Are you sure?"):
             try:
                 shutil.rmtree("./saves")
                 os.makedirs("./saves", exist_ok=True)
-                messagebox.showinfo("Cleared", "All saves have been deleted.")
+                self.show_toast("All saves have been deleted.")                
             except Exception as e:
-                messagebox.showerror("Error", f"Failed to clear saves: {e}")
+                self.show_toast(f"Failed to clear saves: {e}")                  
 
     def load_settings(self): # load settings at settings path. (default settings path is: ./settings.json)
         if os.path.exists(SETTINGS_PATH):
@@ -2268,8 +2236,8 @@ class VisualEditor(tk.Frame):
         if new_id is None or new_id == old_id:
             return
 
-        if new_id in nodes:
-            messagebox.showerror("Error", f"Node ID {new_id} is already in use.", parent=self)
+        if new_id in nodes:       
+            self.show_toast(f"Node ID {new_id} is already in use.", color="red")
             return
 
         self.push_undo()
@@ -2387,7 +2355,6 @@ class VisualEditor(tk.Frame):
 
     def delete_selected_node(self): # delete the selected node
         if self.selected_node is None:
-            #messagebox.showinfo("No node", "Select a node first.")
             return
         
         if not self.settings.get("disable_delete_confirm", False):
@@ -2404,7 +2371,6 @@ class VisualEditor(tk.Frame):
         global START_NODE
         if self.selected_node is not None:
             START_NODE = self.selected_node
-            #messagebox.showinfo("Start node", f"Start node set to {START_NODE}")
     
     def _apply_pending_inspector_edits(self):
         if self.updating: return
@@ -2465,7 +2431,6 @@ class VisualEditor(tk.Frame):
                             except Exception:
                                 parsed = val.strip('"').strip("'")
                     vars_store[name]=parsed
-        #messagebox.showinfo("Vars", "Vars & inventory applied.")
 
     def quick_add_node(self, event=None, x=None, y=None):  
         self._apply_pending_inspector_edits()
@@ -3092,43 +3057,135 @@ class VisualEditor(tk.Frame):
         self._schedule_highlight()
         if keepVarsList == False:
             self.vars_list.delete("1.0", tk.END)
+        
+    def show_toast(self, text, duration=2000, position="bottom-center", color=None):
+        # pick theme/default colors if not specified
+        bg_color = color or self.theme.get("default_node_color", "gray25")
+        text_color = self.theme.get("node_text_fill", "white")
 
-    def save_story_dialog(self): # save story 
-        os.makedirs("./saves", exist_ok=True)
-        save_name = simpledialog.askstring("Save Name", "Enter save name:", initialvalue="my_story")
-        if not save_name:
-            return
-        path = f"./saves/{save_name}.json"
-        if os.path.exists(path):
-            if not messagebox.askyesno("Overwrite?", f"{save_name}.json already exists. Overwrite?"):
+        toast = tk.Toplevel(self)
+        toast.overrideredirect(True)
+        toast.attributes("-topmost", True)
+        toast.configure(bg=self.theme.get("inspector_bg", "gray20"))
+
+        label = ctk.CTkLabel(
+            toast,
+            text=text,
+            text_color=text_color,
+            fg_color=bg_color,
+            corner_radius=8,
+            padx=12,
+            pady=6
+        )
+        label.pack()
+
+        toast.update_idletasks()
+
+        # --- stacking ---
+        sw, sh = toast.winfo_screenwidth(), toast.winfo_screenheight()
+        ww, wh = toast.winfo_width(), toast.winfo_height()
+        pad = 20
+
+        # stack offset
+        offset = len(self.active_toasts) * (wh + 8)
+
+        if position == "bottom-center":
+            x = (sw // 2) - (ww // 2)
+            y = sh - wh - pad - offset
+        elif position == "bottom-right":
+            x, y = sw - ww - pad, sh - wh - pad - offset
+        elif position == "bottom-left":
+            x, y = pad, sh - wh - pad - offset
+        elif position == "top-right":
+            x, y = sw - ww - pad, pad + offset
+        else:  # top-left
+            x, y = pad, pad + offset
+
+        toast.geometry(f"{ww}x{wh}+{x}+{y}")
+
+        # track toast for stacking
+        self.active_toasts.append(toast)
+
+        # --- fade in/out ---
+        def fade_in(alpha=0):
+            if alpha < 1.0:
+                toast.attributes("-alpha", alpha)
+                toast.after(30, fade_in, alpha + 0.1)
+            else:
+                toast.attributes("-alpha", 1.0)
+        fade_in()
+
+        def fade_out(alpha=1.0):
+            if alpha > 0:
+                toast.attributes("-alpha", alpha)
+                toast.after(30, fade_out, alpha - 0.1)
+            else:
+                if toast in self.active_toasts:
+                    self.active_toasts.remove(toast)
+                toast.destroy()
+
+        toast.after(duration, fade_out)
+        
+    def save_story_dialog(self):
+        global CURRENT_FILE
+        if CURRENT_FILE is None:
+            # first-time save, ask user where
+            filepath = filedialog.asksaveasfilename(
+                defaultextension=".json",
+                filetypes=[("Branch Story Files", "*.json"), ("All Files", "*.*")]
+            )
+            if not filepath:
                 return
-        payload = {"nodes": nodes, "vars": vars_store, "inventory": inventory, "start": START_NODE}
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(payload, f, indent=2)
-        messagebox.showinfo("Saved", f"Saved to {path}")
+            CURRENT_FILE = filepath
+        else:
+            filepath = CURRENT_FILE
 
-    def load_story_dialog(self): # load story
-        path = filedialog.askopenfilename(filetypes=[("JSON","*.json")])
-        if not path:
+        # do the saving
+        data = {
+            "nodes": nodes,
+            "vars_store": vars_store,
+            "inventory": inventory
+        }
+        try:
+            with open(filepath, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2)
+            self.show_toast(f"Saved to {filepath}")
+        except Exception as e:
+            self.show_toast("Failed to save!", color="red")
+
+    def save_as_dialog(self):
+        global CURRENT_FILE
+        filepath = filedialog.asksaveasfilename(
+            defaultextension=".json",
+            filetypes=[("Branch Story Files", "*.json"), ("All Files", "*.*")]
+        )
+        if not filepath:
             return
-        with open(path, "r", encoding="utf-8") as f:
-            payload = json.load(f)
-        
-        global nodes, vars_store, inventory, START_NODE
-        nodes = {int(k): v for k,v in payload.get("nodes",{}).items()}
-        vars_store = payload.get("vars", {})
-        inventory[:] = payload.get("inventory", [])
-        START_NODE = payload.get("start", START_NODE)
-        
-        for nid, v in nodes.items():
-            v.setdefault("x", 50 + (nid%5)*60)
-            v.setdefault("y", 50 + (nid%7)*40)
-            v.setdefault("options", v.get("options", []))
-        messagebox.showinfo("Loaded", f"Loaded {path}")
+        CURRENT_FILE = filepath
+        self.save_story_dialog()
+
+    def load_story_dialog(self):
+        global CURRENT_FILE
+        filepath = filedialog.askopenfilename(
+            filetypes=[("Branch Story Files", "*.json"), ("All Files", "*.*")]
+        )
+        if not filepath:
+            return
+        try:
+            with open(filepath, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            nodes.clear(); nodes.update(data.get("nodes", {}))
+            vars_store.clear(); vars_store.update(data.get("vars_store", {}))
+            inventory.clear(); inventory.extend(data.get("inventory", []))
+            CURRENT_FILE = filepath  # <-- remember the file
+            self.redraw()
+            self.show_toast(f"Loaded {filepath}")
+
+        except Exception as e:
+            self.show_toast(f"Failed to load: {e}", color="red")
         self.selected_node = None
         self.redraw()
         self.update_node_count()
-        self.selected_node = 1
         self.load_selected_into_inspector()
 
     def toggle_mode(self): # toggle mode (play>editor, editor>play)
