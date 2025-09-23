@@ -1,40 +1,11 @@
 """ 
 Branch, a CYOA (Choose-Your-Own-Adventure) Maker.
-Version: v0.5.16
+Version: v0.5.19
 
-Changelog:
-@ v0.5.16 -
-    * Added persistent save system:
-        - "Save" (Ctrl+S) now overwrites the last saved/loaded project instead of asking every time.
-        - Added "Save As..." option to pick a new file path.
-        - Added "New Story" button to clear current project and reset file path.
-    * Added non-blocking toast notifications (replacing messagebox popups).
-    * Window Title Update:
-        - Titlebar now shows current project name (e.g., "Branch — my_story.json").
-    * Autosave System:
-        - New setting: "Enable Autosave" (on/off).
-        - New setting: "Autosave Time" (seconds, min 30).
-        - If enabled and project has a file, autosave runs on interval.
-        - Autosaves are written to a separate ".autosave.json" file alongside the main project.
-        - On load, if an autosave exists, user is prompted to load it instead of the main file.        
-
-@ v0.5.15 -
-    * Small UI update, mostly in Play Mode.
-
-@ v0.5.14 -
-    * Bugfixes (@timer fix)
-    * @timer now allows decimal seconds such as "@timer(0.1)"
-
-@ v0.5.13 -
-    * Expanded action syntax support: all [func]>[act] forms (such as repeat, once, @timer, chance, etc.) now accept '>>' and '<...>' variants, just like if-statements.
-        - '>' Runs only the first action.
-        - '>>' Runs all actions.
-        - ':<...>' Runs conditional actions inside '<...>', followed by unconditional actions after.
-    * Fixed bug where '@ACT' instant actions wouldn't run due to missing argument in run_instant_leaves().
-
+[The changelog will no longer be mentioned here, all changelog updates are mentioned in the Documentation. (https://ch3rryc0d3r.github.io/branch-cyoa-maker/Documentation/)]
 ...
 """
-VERSION = 'v0.5.16'
+VERSION = 'v0.5.19'
 
 # built-ins
 import os, re, ast, math, json, copy, random, operator, time
@@ -2165,11 +2136,27 @@ class VisualEditor(tk.Frame):
         # fix these later - sept 22, 2025.
         #menu.add_command(label="Connect", command=lambda: self.enter_connection_mode(clicked_node))
         #menu.add_command(label="Disconnect", command=lambda: self.enter_disconnect_mode(clicked_node))
-
+        menu.add_command(label="Test from Here", command=lambda: self.test_from_node(clicked_node))
         menu.add_command(label="Delete", command=self.delete_multi_nodes)
 
         menu.tk_popup(event.x_root, event.y_root)
         return "break"
+
+    def test_from_node(self, node_id):
+        if node_id not in nodes:
+            self.show_toast("Invalid start node", color="red")
+            return
+
+        # stash backups like normal play mode does
+        self.editor_vars_backup = copy.deepcopy(vars_store)
+        self.editor_inventory_backup = inventory.copy()
+        self.nodes_backup = copy.deepcopy(nodes)
+
+        # override the play start
+        self.play_current = node_id
+
+        # now enter play mode as usual
+        self.enter_play_mode()
 
     def start_connect(self, node_id):
         if self.connecting_from is None:
@@ -3326,11 +3313,12 @@ class VisualEditor(tk.Frame):
 
     def toggle_mode(self): # toggle mode (play>editor, editor>play)
         if self.mode == "editor":
+            self.play_current = START_NODE
             self.enter_play_mode()
         else:
             self.enter_editor_mode()
-    
-    def enter_play_mode(self): # enter play mode
+
+    def enter_play_mode(self):  # enter play mode
         self._apply_pending_inspector_edits()
         self.editor_vars_backup = copy.deepcopy(vars_store)
         self.editor_inventory_backup = inventory.copy()
@@ -3340,20 +3328,28 @@ class VisualEditor(tk.Frame):
         self.mode_button.configure(text="Switch to Editor Mode")
         self.reset_state()
 
-        dark_bg = "#424242"
+        dark_bg = "#1e1e1e"
+        fg = "#e0e0e0"
+        btn_bg = "#2d2d2d"
+        btn_active = "#3c3c3c"
+        accent = "#4cafef"
 
+        # Play window
         self.play_window = tk.Toplevel(self.master, bg=dark_bg)
         self.play_window.title("Play Mode")
         self.play_window.geometry("480x360")
-        self.play_window.protocol("WM_DELETE_WINDOW", self.close_play)       
+        self.play_window.protocol("WM_DELETE_WINDOW", self.close_play)
 
+        # Header
         tk.Label(
             self.play_window,
             text="Play Mode",
-            bg=dark_bg,  # same as parent = fake transparency
-            fg="white"
-        ).pack()
+            bg=dark_bg,
+            fg=accent,
+            font=("TkDefaultFont", 12, "bold")
+        ).pack(pady=(6, 4))
 
+        # Main play area
         self.play_area = tk.Frame(self.play_window, bg=dark_bg)
         self.play_area.pack(fill=tk.BOTH, expand=True)
 
@@ -3362,30 +3358,36 @@ class VisualEditor(tk.Frame):
             text="",
             wraplength=440,
             justify="left",
-            font=("TkDefaultFont", 11),
+            font=("TkDefaultFont", 12),
             bg=dark_bg,
-            fg="white"
+            fg=fg
         )
-        self.play_header.pack(pady=(10,5))
+        self.play_header.pack(pady=(10, 5))
 
         self.choice_frame = tk.Frame(self.play_area, bg=dark_bg)
-        self.choice_frame.pack(pady=(6,10))
+        self.choice_frame.pack(pady=(6, 10))
 
+        # Control bar
         ctrl = tk.Frame(self.play_window, bg=dark_bg)
-        ctrl.pack(fill=tk.X)
+        ctrl.pack(fill=tk.X, pady=6)
 
         tk.Button(
             ctrl,
             text="Restart",
             command=self.play_restart,
-            bg=dark_bg,   # match parent = fake transparency
-            fg="white",
-            activebackground="#5a5a5a",
-            activeforeground="white",
-            relief="flat"
-        ).pack(side=tk.LEFT)
+            bg=btn_bg,
+            fg=fg,
+            activebackground=btn_active,
+            activeforeground=fg,
+            relief="flat",
+            highlightbackground=accent,
+            highlightthickness=1,
+            padx=8,
+            pady=4
+        ).pack(side=tk.LEFT, padx=6)
 
-        self.play_current = START_NODE
+        # State + first render
+        self.play_current = getattr(self, "play_current", START_NODE)
         self.play_path = []
         self.play_render_current()
 
