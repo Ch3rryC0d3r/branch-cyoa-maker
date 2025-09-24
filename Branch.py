@@ -1,9 +1,6 @@
 """ 
 Branch, a CYOA (Choose-Your-Own-Adventure) Maker.
 Version: v0.5.19
-
-[The changelog will no longer be mentioned here, all changelog updates are mentioned in the Documentation. (https://ch3rryc0d3r.github.io/branch-cyoa-maker/Documentation/)]
-...
 """
 VERSION = 'v0.5.19'
 
